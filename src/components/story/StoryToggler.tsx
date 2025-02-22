@@ -10,6 +10,7 @@ import { ANIMATION_END_DELAY, PREVIEW_AVATAR_COUNT } from '../../config';
 import { selectIsForumPanelOpen, selectPerformanceSettingsValue, selectTabState } from '../../global/selectors';
 import { animateClosing, animateOpening, ANIMATION_DURATION } from './helpers/ribbonAnimation';
 
+import useAppLayout from '../../hooks/useAppLayout';
 import useOldLang from '../../hooks/useOldLang';
 import useShowTransition from '../../hooks/useShowTransition';
 import useStoryPreloader from './hooks/useStoryPreloader';
@@ -95,17 +96,17 @@ function StoryToggler({
     className: 'slow',
     withShouldRender: true,
   });
-
+  const { isMobile } = useAppLayout();
   useEffect(() => {
     if (!withAnimation || isForumPanelOpen) return;
     if (isVisible) {
       beginHeavyAnimation(ANIMATION_DURATION + ANIMATION_END_DELAY);
-      animateClosing(isArchived);
+      animateClosing(isArchived, !isMobile);
     } else {
       beginHeavyAnimation(ANIMATION_DURATION + ANIMATION_END_DELAY);
-      animateOpening(isArchived);
+      animateOpening(isArchived, !isMobile);
     }
-  }, [isArchived, isVisible, withAnimation, isForumPanelOpen]);
+  }, [isArchived, isVisible, withAnimation, isForumPanelOpen, isMobile]);
 
   if (!shouldRender) {
     return undefined;

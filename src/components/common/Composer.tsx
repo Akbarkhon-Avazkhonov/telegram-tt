@@ -1,6 +1,7 @@
 import type { FC } from '../../lib/teact/teact';
 import React, {
-  memo, useEffect, useMemo, useRef, useSignal, useState,
+  memo, useCallback,
+  useEffect, useMemo, useRef, useSignal, useState,
 } from '../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../global';
 
@@ -40,6 +41,7 @@ import type {
   MessageListType,
   ThreadId,
 } from '../../types';
+import type { Diff } from '../../util/stringDiff';
 import { MAIN_THREAD_ID } from '../../api/types';
 
 import {
@@ -99,6 +101,7 @@ import {
 } from '../../global/selectors';
 import { selectCurrentLimit } from '../../global/selectors/limits';
 import buildClassName from '../../util/buildClassName';
+import { getCurrentCursorPosition, setCursorPosition } from '../../util/cursor-operations';
 import { formatMediaDuration, formatVoiceRecordDuration } from '../../util/dates/dateFormat';
 import { processDeepLink } from '../../util/deeplink';
 import { tryParseDeepLink } from '../../util/deepLinkParser';
@@ -109,6 +112,7 @@ import { MEMO_EMPTY_ARRAY } from '../../util/memo';
 import parseHtmlAsFormattedText from '../../util/parseHtmlAsFormattedText';
 import { insertHtmlInSelection } from '../../util/selection';
 import { getServerTime } from '../../util/serverTime';
+import { applyDiff, computeDiff } from '../../util/stringDiff';
 import { IS_IOS, IS_VOICE_RECORDING_SUPPORTED } from '../../util/windowEnvironment';
 import windowSize from '../../util/windowSize';
 import applyIosAutoCapitalizationFix from '../middle/composer/helpers/applyIosAutoCapitalizationFix';
@@ -196,6 +200,7 @@ type OwnProps = {
   onForward?: NoneToVoidFunction;
   onFocus?: NoneToVoidFunction;
   onBlur?: NoneToVoidFunction;
+  onSend?:NoneToVoidFunction;
 };
 
 type StateProps =
@@ -295,7 +300,10 @@ const MOBILE_KEYBOARD_HIDE_DELAY_MS = 100;
 const SELECT_MODE_TRANSITION_MS = 200;
 const SENDING_ANIMATION_DURATION = 350;
 const MOUNT_ANIMATION_DURATION = 430;
-
+type InputDiff = Diff & {
+  beforeCursorPosition:number;
+  afterCursorPosition:number;
+};
 const Composer: FC<OwnProps & StateProps> = ({
   type,
   isOnActiveTab,
@@ -386,6 +394,7 @@ const Composer: FC<OwnProps & StateProps> = ({
   canPlayEffect,
   shouldPlayEffect,
   maxMessageLength,
+  onSend: onSendProps,
 }) => {
   const {
     sendMessage,
@@ -415,6 +424,10 @@ const Composer: FC<OwnProps & StateProps> = ({
   } = getActions();
 
   const lang = useOldLang();
+  const [undoStack, setUndoStack] = useState<InputDiff[]>([]);
+  const [redoStack, setRedoStack] = useState<InputDiff[]>([]);
+  const lastContentRef = useRef('');
+  const inputTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // eslint-disable-next-line no-null/no-null
   const inputRef = useRef<HTMLDivElement>(null);
@@ -423,6 +436,7 @@ const Composer: FC<OwnProps & StateProps> = ({
   const storyReactionRef = useRef<HTMLButtonElement>(null);
 
   const [getHtml, setHtml] = useSignal('');
+
   const [isMounted, setIsMounted] = useState(false);
   const getSelectionRange = useGetSelectionRange(editableInputCssSelector);
   const lastMessageSendTimeSeconds = useRef<number>();
@@ -725,6 +739,51 @@ const Composer: FC<OwnProps & StateProps> = ({
     chatBotCommands,
     canSendQuickReplies ? quickReplies : undefined,
   );
+
+  const undo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    const diff = undoStack[undoStack.length - 1];
+
+    const inverseDiff = {
+      prefix: diff.prefix,
+      suffix: diff.suffix,
+      removed: diff.added,
+      added: diff.removed,
+    };
+
+    const currentContent = getHtml();
+    const newContent = applyDiff(currentContent, inverseDiff);
+
+    setHtml(newContent);
+    lastContentRef.current = newContent;
+
+    setRedoStack((prev) => [...prev, diff]);
+    setUndoStack((prev) => prev.slice(0, prev.length - 1));
+    setTimeout(() => {
+      if (inputRef.current) {
+        setCursorPosition(inputRef.current, diff.beforeCursorPosition);
+      }
+    }, 0);
+  }, [getHtml, setHtml, undoStack]);
+
+  const redo = useCallback(() => {
+    if (redoStack.length === 0) return;
+    const diff = redoStack[redoStack.length - 1];
+    const currentContent = getHtml();
+    const newContent = applyDiff(currentContent, diff);
+    setHtml(newContent);
+    lastContentRef.current = newContent;
+
+    setRedoStack((prev) => prev.slice(0, prev.length - 1));
+    setUndoStack((prev) => [...prev, diff]);
+
+    setTimeout(() => {
+      if (inputRef.current) {
+        setCursorPosition(inputRef.current, diff.afterCursorPosition);
+      }
+    }, 0);
+  }, [getHtml, redoStack, setHtml]);
+  const prevCursor = useRef(0);
 
   useDraft({
     draft,
@@ -1081,7 +1140,7 @@ const Composer: FC<OwnProps & StateProps> = ({
         isSilent,
       });
     }
-
+    onSendProps?.();
     lastMessageSendTimeSeconds.current = getServerTime();
     clearDraft({
       chatId, threadId, isLocalOnly: true, shouldKeepReply: isForwarding,
@@ -1606,9 +1665,32 @@ const Composer: FC<OwnProps & StateProps> = ({
 
   const withBotCommands = isChatWithBot && botMenuButton?.type === 'commands' && !editingMessage
     && botCommands !== false && !activeVoiceRecording;
-
   const effectEmoji = areEffectsSupported && effect?.emoticon;
+  const onUpdate = useCallback((html: string) => {
+    setHtml(html);
+    if (html === lastContentRef.current) return;
 
+    if (inputTimeoutRef.current) {
+      clearTimeout(inputTimeoutRef.current);
+    }
+
+    inputTimeoutRef.current = setTimeout(() => {
+      const currentContent = html;
+      if (currentContent === lastContentRef.current) return;
+
+      const diff = computeDiff(lastContentRef.current, currentContent);
+      const cursorPosition = getCurrentCursorPosition(inputRef.current!);
+
+      // Record the diff only if there was an actual change.
+      if (diff.removed !== '' || diff.added !== '') {
+        setUndoStack((prev) => [...prev,
+          { ...diff, beforeCursorPosition: prevCursor.current, afterCursorPosition: cursorPosition }]);
+        prevCursor.current = cursorPosition;
+        setRedoStack([]); // Clear the redo stack on new input.
+        lastContentRef.current = currentContent;
+      }
+    }, 300);
+  }, [setHtml]);
   return (
     <div className={fullClassName}>
       {isInMessageList && canAttachMedia && isReady && (
@@ -1663,6 +1745,8 @@ const Composer: FC<OwnProps & StateProps> = ({
         editingMessage={editingMessage}
         onSendWhenOnline={handleSendWhenOnline}
         canScheduleUntilOnline={canScheduleUntilOnline && !isViewOnceEnabled}
+        undo={undo}
+        redo={redo}
       />
       <PollModal
         isOpen={pollModal.isOpen}
@@ -1836,6 +1920,8 @@ const Composer: FC<OwnProps & StateProps> = ({
             canSendPlainText={!isComposerBlocked}
             threadId={threadId}
             isReady={isReady}
+            undo={undo}
+            redo={redo}
             isActive={!hasAttachments}
             getHtml={getHtml}
             placeholder={
@@ -1852,7 +1938,7 @@ const Composer: FC<OwnProps & StateProps> = ({
             noFocusInterception={hasAttachments}
             shouldSuppressFocus={isMobile && isSymbolMenuOpen}
             shouldSuppressTextFormatter={isEmojiTooltipOpen || isMentionTooltipOpen || isInlineBotTooltipOpen}
-            onUpdate={setHtml}
+            onUpdate={onUpdate}
             onSend={onSend}
             onSuppressedFocus={closeSymbolMenu}
             onFocus={markInputHasFocus}

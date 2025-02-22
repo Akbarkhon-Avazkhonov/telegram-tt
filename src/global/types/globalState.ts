@@ -412,6 +412,7 @@ export type GlobalState = {
     botVerificationShownPeerIds: string[];
     miniAppsCachedPosition?: Point;
     miniAppsCachedSize?: Size;
+    isEditFolderIconPickerOpen?: boolean;
   };
 
   push?: {

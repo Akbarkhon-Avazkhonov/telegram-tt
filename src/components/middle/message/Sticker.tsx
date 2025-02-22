@@ -30,8 +30,8 @@ const EFFECT_SIZE_MULTIPLIER = 1 + 0.245 * 2;
 
 type OwnProps = {
   message: ApiMessage;
-  observeIntersection: ObserveFn;
-  observeIntersectionForPlaying: ObserveFn;
+  observeIntersection?: ObserveFn;
+  observeIntersectionForPlaying?: ObserveFn;
   shouldLoop?: boolean;
   shouldPlayEffect?: boolean;
   withEffect?: boolean;

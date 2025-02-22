@@ -12,11 +12,15 @@ import { PRODUCTION_URL } from '../../../config';
 import buildClassName from '../../../util/buildClassName';
 import { IS_ELECTRON, IS_TOUCH_ENV } from '../../../util/windowEnvironment';
 
+import useAppLayout from '../../../hooks/useAppLayout';
+import useDerivedState from '../../../hooks/useDerivedState';
 import useForumPanelRender from '../../../hooks/useForumPanelRender';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
+import useShowTransition from '../../../hooks/useShowTransition';
 import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDeprecated';
 
+import StoryRibbon from '../../story/StoryRibbon';
 import Button from '../../ui/Button';
 import Transition from '../../ui/Transition';
 import NewChatButton from '../NewChatButton';
@@ -25,6 +29,7 @@ import ChatFolders from './ChatFolders';
 import ContactList from './ContactList.async';
 import ForumPanel from './ForumPanel';
 import LeftMainHeader from './LeftMainHeader';
+import SelectedTabChatList from './SelectedTabChatList';
 
 import './LeftMain.scss';
 
@@ -44,6 +49,7 @@ type OwnProps = {
   onSettingsScreenSelect: (screen: SettingsScreens) => void;
   onTopicSearch: NoneToVoidFunction;
   onReset: () => void;
+  isStoryRibbonShown?: boolean;
 };
 
 const TRANSITION_RENDER_COUNT = Object.keys(LeftColumnContent).length / 2;
@@ -67,6 +73,7 @@ const LeftMain: FC<OwnProps> = ({
   onSettingsScreenSelect,
   onReset,
   onTopicSearch,
+  isStoryRibbonShown,
 }) => {
   const { closeForumPanel } = getActions();
   const [isNewChatButtonShown, setIsNewChatButtonShown] = useState(IS_TOUCH_ENV);
@@ -163,10 +170,22 @@ const LeftMain: FC<OwnProps> = ({
   }, [content]);
 
   const lang = useOldLang();
-
+  const {
+    ref,
+    shouldRender: shouldRenderStoryRibbon,
+    getIsClosing: getIsStoryRibbonClosing,
+  } = useShowTransition({
+    isOpen: isStoryRibbonShown,
+    className: false,
+    withShouldRender: true,
+  });
+  const isStoryRibbonClosing = useDerivedState(getIsStoryRibbonClosing);
+  const { isMobile } = useAppLayout();
   return (
     <div
       id="LeftColumn-main"
+      ref={ref}
+      className={buildClassName(shouldRenderStoryRibbon && 'with-story-ribbon')}
       onMouseEnter={!IS_TOUCH_ENV ? handleMouseEnter : undefined}
       onMouseLeave={!IS_TOUCH_ENV ? handleMouseLeave : undefined}
     >
@@ -182,6 +201,7 @@ const LeftMain: FC<OwnProps> = ({
         shouldSkipTransition={shouldSkipTransition}
         isClosingSearch={isClosingSearch}
       />
+      <StoryRibbon isClosing={isStoryRibbonClosing} isOpen={shouldRenderStoryRibbon} />
       <Transition
         name={shouldSkipTransition ? 'none' : 'zoomFade'}
         renderCount={TRANSITION_RENDER_COUNT}
@@ -195,13 +215,17 @@ const LeftMain: FC<OwnProps> = ({
           switch (content) {
             case LeftColumnContent.ChatList:
               return (
-                <ChatFolders
-                  shouldHideFolderTabs={isForumPanelVisible}
-                  onSettingsScreenSelect={onSettingsScreenSelect}
-                  onLeftColumnContentChange={onContentChange}
-                  foldersDispatch={foldersDispatch}
-                  isForumPanelOpen={isForumPanelVisible}
-                />
+                isMobile
+                  ? (
+                    <ChatFolders
+                      shouldHideFolderTabs={isForumPanelVisible}
+                      onSettingsScreenSelect={onSettingsScreenSelect}
+                      onLeftColumnContentChange={onContentChange}
+                      foldersDispatch={foldersDispatch}
+                      isForumPanelOpen={isForumPanelVisible}
+                    />
+                  )
+                  : <SelectedTabChatList onLeftColumnContentChange={onContentChange} />
               );
             case LeftColumnContent.GlobalSearch:
               return (

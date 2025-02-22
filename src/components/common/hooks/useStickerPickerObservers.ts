@@ -87,7 +87,12 @@ export function useStickerPickerObservers(
     }
   }, [freezeForSet, freezeForShowingItems, isHidden, unfreezeForSet, unfreezeForShowingItems]);
 
-  const selectStickerSet = useLastCallback((index: number) => {
+  const selectStickerSet = useLastCallback((
+    index: number,
+    isSilent?: boolean,
+    shouldSchedule?: boolean,
+    additionalOffset?:number,
+  ) => {
     setActiveSetIndex((currentIndex) => {
       const stickerSetEl = document.getElementById(`${idPrefix}-${index}`)!;
       const isClose = Math.abs(currentIndex - index) === 1;
@@ -96,7 +101,7 @@ export function useStickerPickerObservers(
         container: containerRef.current!,
         element: stickerSetEl,
         position: 'start',
-        margin: FOCUS_MARGIN,
+        margin: FOCUS_MARGIN + (additionalOffset || 0),
         maxDistance: isClose ? SCROLL_MAX_DISTANCE_WHEN_CLOSE : SCROLL_MAX_DISTANCE_WHEN_FAR,
       });
 

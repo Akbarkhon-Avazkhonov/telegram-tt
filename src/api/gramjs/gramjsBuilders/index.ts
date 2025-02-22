@@ -763,7 +763,7 @@ export function buildInputReplyTo(replyInfo: ApiInputReplyInfo) {
 
   if (replyInfo.type === 'message') {
     const {
-      replyToMsgId, replyToTopId, replyToPeerId, quoteText,
+      replyToMsgId, replyToTopId, replyToPeerId, quoteText, quoteOffset,
     } = replyInfo;
     return new GramJs.InputReplyToMessage({
       replyToMsgId,
@@ -771,6 +771,7 @@ export function buildInputReplyTo(replyInfo: ApiInputReplyInfo) {
       replyToPeerId: replyToPeerId ? buildInputPeerFromLocalDb(replyToPeerId)! : undefined,
       quoteText: quoteText?.text,
       quoteEntities: quoteText?.entities?.map(buildMtpMessageEntity),
+      quoteOffset,
     });
   }
 

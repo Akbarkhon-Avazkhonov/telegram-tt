@@ -1,5 +1,6 @@
 import React, {
   memo, useEffect, useMemo,
+  useRef,
   useState,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
@@ -65,6 +66,7 @@ import {
   IS_ANDROID, IS_ELECTRON, IS_IOS, IS_SAFARI, IS_TRANSLATION_SUPPORTED, MASK_IMAGE_DISABLED,
 } from '../../util/windowEnvironment';
 import calculateMiddleFooterTransforms from './helpers/calculateMiddleFooterTransforms';
+import BackgroundShadersCanvas from './backgroundShadersCanvas';
 
 import useAppLayout from '../../hooks/useAppLayout';
 import useCustomBackground from '../../hooks/useCustomBackground';
@@ -229,10 +231,9 @@ function MiddleColumn({
     resetLeftColumnWidth,
     unblockUser,
   } = getActions();
-
+  const animateFnRef = useRef<NoneToVoidFunction | undefined>(undefined);
   const { width: windowWidth } = useWindowSize();
   const { isTablet, isDesktop } = useAppLayout();
-
   const lang = useOldLang();
   const [dropAreaState, setDropAreaState] = useState(DropAreaState.None);
   const [isScrollDownNeeded, setIsScrollDownShown] = useState(false);
@@ -416,6 +417,7 @@ function MiddleColumn({
   });
 
   const customBackgroundValue = useCustomBackground(theme, customBackground);
+  const shouldAnimateBackground = !document.querySelector('.no-message-sending-animations') && !customBackgroundValue;
 
   const className = buildClassName(
     MASK_IMAGE_DISABLED ? 'mask-image-disabled' : 'mask-image-enabled',
@@ -504,7 +506,9 @@ function MiddleColumn({
       <div
         className={bgClassName}
         style={customBackgroundValue ? `--custom-background: ${customBackgroundValue}` : undefined}
-      />
+      >
+        {shouldAnimateBackground && <BackgroundShadersCanvas theme={theme} animateFnRef={animateFnRef} />}
+      </div>
       <div id="middle-column-portals" />
       {Boolean(renderingChatId && renderingThreadId) && (
         <>
@@ -565,6 +569,7 @@ function MiddleColumn({
                     editableInputId={EDITABLE_INPUT_ID}
                     editableInputCssSelector={EDITABLE_INPUT_CSS_SELECTOR}
                     inputId="message-input-text"
+                    onSend={shouldAnimateBackground ? animateFnRef.current : undefined}
                   />
                 )}
                 {isPinnedMessageList && canUnpin && (

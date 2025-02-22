@@ -1,14 +1,19 @@
-import type { FC } from '../../../../lib/teact/teact';
+import type { FC, TeactNode } from '../../../../lib/teact/teact';
 import React, {
-  memo, useCallback, useEffect, useMemo, useState,
+  memo, useCallback, useEffect, useMemo, useRef, useState,
 } from '../../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../../global';
 
-import type { ApiChatlistExportedInvite } from '../../../../api/types';
 import type {
   FolderEditDispatch,
   FoldersState,
 } from '../../../../hooks/reducers/useFoldersReducer';
+import type { IAnchorPosition } from '../../../../types';
+import {
+  type ApiChatlistExportedInvite,
+  type ApiMessageEntityCustomEmoji,
+  ApiMessageEntityTypes,
+} from '../../../../api/types';
 
 import { STICKER_SIZE_FOLDER_SETTINGS } from '../../../../config';
 import { isUserId } from '../../../../global/helpers';
@@ -18,19 +23,26 @@ import { findIntersectionWithSet } from '../../../../util/iteratees';
 import { MEMO_EMPTY_ARRAY } from '../../../../util/memo';
 import { CUSTOM_PEER_EXCLUDED_CHAT_TYPES, CUSTOM_PEER_INCLUDED_CHAT_TYPES } from '../../../../util/objects/customPeer';
 import { LOCAL_TGS_URLS } from '../../../common/helpers/animatedAssets';
+import renderText from '../../../common/helpers/renderText';
+import {
+  BotIcon, ChannelIcon, ChatIcon, ChatsIcon, FolderIcon, GroupIcon, StarIcon,
+  UserIcon,
+} from './icons/predifinedFolderIcons';
 
 import { selectChatFilters } from '../../../../hooks/reducers/useFoldersReducer';
+import useFlag from '../../../../hooks/useFlag';
 import useHistoryBack from '../../../../hooks/useHistoryBack';
+import useLastCallback from '../../../../hooks/useLastCallback';
 import useOldLang from '../../../../hooks/useOldLang';
 
 import AnimatedIcon from '../../../common/AnimatedIcon';
+import CustomEmoji from '../../../common/CustomEmoji';
 import GroupChatInfo from '../../../common/GroupChatInfo';
-import Icon from '../../../common/icons/Icon';
 import PrivateChatInfo from '../../../common/PrivateChatInfo';
-import FloatingActionButton from '../../../ui/FloatingActionButton';
+import Button from '../../../ui/Button';
 import InputText from '../../../ui/InputText';
 import ListItem from '../../../ui/ListItem';
-import Spinner from '../../../ui/Spinner';
+import FolderIconPicker, { PREDEFINED_ICONS } from './FolderIconPicker';
 
 type OwnProps = {
   state: FoldersState;
@@ -56,12 +68,42 @@ type StateProps = {
   chatListCount: number;
 };
 
-const SUBMIT_TIMEOUT = 500;
-
 const INITIAL_CHATS_LIMIT = 5;
 
 export const ERROR_NO_TITLE = 'Please provide a title for this folder.';
 export const ERROR_NO_CHATS = 'ChatList.Filter.Error.Empty';
+
+const getEmoticon = (state:FoldersState):TeactNode | undefined => {
+  if (!state.folder.emoticon) {
+    const customEmoji = state.folder.title?.entities
+      ?.find((ent) => ent.type === ApiMessageEntityTypes.CustomEmoji) as ApiMessageEntityCustomEmoji;
+    if (customEmoji) {
+      return <CustomEmoji className="folder-custom-emoji" documentId={customEmoji.documentId} />;
+    }
+    return <FolderIcon className="predefined-icon" />;
+  }
+
+  switch (state.folder.emoticon) {
+    case PREDEFINED_ICONS.CHATS:
+      return <ChatsIcon className="predefined-icon" />;
+    case PREDEFINED_ICONS.CHAT:
+      return <ChatIcon className="predefined-icon" />;
+    case PREDEFINED_ICONS.PERSON:
+      return <UserIcon className="predefined-icon" />;
+    case PREDEFINED_ICONS.GROUP:
+      return <GroupIcon className="predefined-icon" />;
+    case PREDEFINED_ICONS.BOT:
+      return <BotIcon className="predefined-icon" />;
+    case PREDEFINED_ICONS.STAR:
+      return <StarIcon className="predefined-icon" />;
+    case PREDEFINED_ICONS.CHANNEL:
+      return <ChannelIcon className="predefined-icon" />;
+    case PREDEFINED_ICONS.FOLDER:
+      return <FolderIcon className="predefined-icon" />;
+    default:
+      return <span className="emoji-emoticon">{renderText(state.folder.emoticon, ['emoji'])[0]}</span>;
+  }
+};
 
 const SettingsFoldersEdit: FC<OwnProps & StateProps> = ({
   state,
@@ -94,7 +136,6 @@ const SettingsFoldersEdit: FC<OwnProps & StateProps> = ({
 
   const [isIncludedChatsListExpanded, setIsIncludedChatsListExpanded] = useState(false);
   const [isExcludedChatsListExpanded, setIsExcludedChatsListExpanded] = useState(false);
-
   useEffect(() => {
     if (isRemoved) {
       onReset();
@@ -155,16 +196,6 @@ const SettingsFoldersEdit: FC<OwnProps & StateProps> = ({
     const { currentTarget } = event;
     dispatch({ type: 'setTitle', payload: currentTarget.value.trim() });
   }, [dispatch]);
-
-  const handleSubmit = useCallback(() => {
-    dispatch({ type: 'setIsLoading', payload: true });
-
-    onSaveFolder(() => {
-      setTimeout(() => {
-        onReset();
-      }, SUBMIT_TIMEOUT);
-    });
-  }, [dispatch, onSaveFolder, onReset]);
 
   const handleCreateInviteClick = useCallback(() => {
     if (!invites) {
@@ -278,6 +309,26 @@ const SettingsFoldersEdit: FC<OwnProps & StateProps> = ({
       </>
     );
   }
+  // eslint-disable-next-line no-null/no-null
+  const pickerTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [contextMenuAnchor, setContextMenuAnchor] = useState<IAnchorPosition | undefined>(undefined);
+
+  const [isEditFolderIconPickerOpen, openFolderIconPicker, closeFolderIconPicker] = useFlag(false);
+  const toggleFolderIconPicker = useLastCallback(() => {
+    if (isEditFolderIconPickerOpen) {
+      closeFolderIconPicker();
+    } else {
+      const triggerEl = pickerTriggerRef.current;
+      if (!triggerEl) return;
+      const { x, y } = triggerEl.getBoundingClientRect();
+      setContextMenuAnchor({ x, y });
+      openFolderIconPicker();
+    }
+  });
+
+  const handleChangeEmoticon = useCallback((emoji:string, documentId?: string) => {
+    dispatch({ type: 'setEmoticon', payload: { emoji, documentId } });
+  }, [dispatch]);
 
   return (
     <div className="settings-fab-wrapper">
@@ -295,16 +346,35 @@ const SettingsFoldersEdit: FC<OwnProps & StateProps> = ({
               {lang('FilterIncludeInfo')}
             </p>
           )}
+          <div className="folder-name-input-wrapper">
+            <InputText
+              className="mb-0"
+              label={lang('FilterNameHint')}
+              value={state.folder.title.text}
+              onChange={handleChange}
+              maxLength={12}
+              error={state.error && state.error === ERROR_NO_TITLE ? ERROR_NO_TITLE : undefined}
+            />
+            <Button
+              ref={pickerTriggerRef}
+              size="tiny"
+              color="translucent"
+              className="folder-name-icon"
+              onClick={toggleFolderIconPicker}
+            >
+              {getEmoticon(state)}
+            </Button>
 
-          <InputText
-            className="mb-0"
-            label={lang('FilterNameHint')}
-            value={state.folder.title.text}
-            onChange={handleChange}
-            error={state.error && state.error === ERROR_NO_TITLE ? ERROR_NO_TITLE : undefined}
-          />
+          </div>
         </div>
-
+        <FolderIconPicker
+          isOpen={isEditFolderIconPickerOpen}
+          onClose={closeFolderIconPicker}
+          className="picker-tab"
+          trigger={pickerTriggerRef.current}
+          contextMenuAnchor={contextMenuAnchor}
+          onEmojiSelect={handleChangeEmoticon}
+        />
         {!isOnlyInvites && (
           <div className="settings-item pt-3">
             {state.error && state.error === ERROR_NO_CHATS && (
@@ -377,19 +447,6 @@ const SettingsFoldersEdit: FC<OwnProps & StateProps> = ({
 
         </div>
       </div>
-
-      <FloatingActionButton
-        isShown={Boolean(state.isTouched)}
-        disabled={state.isLoading}
-        onClick={handleSubmit}
-        ariaLabel={state.mode === 'edit' ? 'Save changes' : 'Create folder'}
-      >
-        {state.isLoading ? (
-          <Spinner color="white" />
-        ) : (
-          <Icon name="check" />
-        )}
-      </FloatingActionButton>
     </div>
   );
 };

@@ -5,13 +5,17 @@
   padding: 0.25rem 0.5rem 0.5rem 1rem;
   overflow-x: auto;
   white-space: nowrap;
-  max-height: 5.5rem;
+  height: 0;
   position: relative;
   z-index: var(--z-story-ribbon);
-
-  transition: opacity 0.2s ease-in-out;
-
+  /* stylelint-disable-next-line plugin/no-low-performance-animation-properties */
+  transition: height 0.3s ease-in-out, opacity 0.3s ease-in-out;
   animation: fadeIn 0.2s ease-in-out;
+}
+
+.open {
+  max-height: 5.5rem;
+  height: 5.5rem;
 }
 
 .closing {

@@ -17,6 +17,7 @@ interface OwnProps {
   isArchived?: boolean;
   className?: string;
   isClosing?: boolean;
+  isOpen?: boolean;
 }
 
 interface StateProps {
@@ -32,6 +33,7 @@ function StoryRibbon({
   usersById,
   chatsById,
   isClosing,
+  isOpen,
 }: OwnProps & StateProps) {
   const lang = useOldLang();
   const fullClassName = buildClassName(
@@ -39,6 +41,7 @@ function StoryRibbon({
     !orderedPeerIds.length && styles.hidden,
     isClosing && styles.closing,
     className,
+    (isOpen && !isClosing) && styles.open,
     'no-scrollbar',
   );
 
@@ -54,7 +57,7 @@ function StoryRibbon({
       className={fullClassName}
       dir={lang.isRtl ? 'rtl' : undefined}
     >
-      {orderedPeerIds.map((peerId) => {
+      {isOpen && orderedPeerIds.map((peerId) => {
         const peer = usersById[peerId] || chatsById[peerId];
 
         if (!peer) {

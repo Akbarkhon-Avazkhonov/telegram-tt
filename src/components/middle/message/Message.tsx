@@ -198,9 +198,9 @@ type MessagePositionProperties = {
 type OwnProps =
   {
     message: ApiMessage;
-    observeIntersectionForBottom: ObserveFn;
-    observeIntersectionForLoading: ObserveFn;
-    observeIntersectionForPlaying: ObserveFn;
+    observeIntersectionForBottom?: ObserveFn;
+    observeIntersectionForLoading?: ObserveFn;
+    observeIntersectionForPlaying?: ObserveFn;
     album?: IAlbum;
     noAvatars?: boolean;
     withAvatar?: boolean;
@@ -212,8 +212,8 @@ type OwnProps =
     appearanceOrder: number;
     isJustAdded: boolean;
     memoFirstUnreadIdRef: { current: number | undefined };
-    getIsMessageListReady: Signal<boolean>;
-    onIntersectPinnedMessage: OnIntersectPinnedMessage;
+    getIsMessageListReady?: Signal<boolean>;
+    onIntersectPinnedMessage?: OnIntersectPinnedMessage;
   }
   & MessagePositionProperties;
 
@@ -488,7 +488,7 @@ const Message: FC<OwnProps & StateProps> = ({
   useUnmountCleanup(() => {
     if (message.isPinned) {
       const id = album ? album.mainMessage.id : messageId;
-      onIntersectPinnedMessage({ viewportPinnedIdsToRemove: [id] });
+      onIntersectPinnedMessage?.({ viewportPinnedIdsToRemove: [id] });
     }
   });
 

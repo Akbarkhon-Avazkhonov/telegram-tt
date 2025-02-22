@@ -117,3 +117,92 @@
   flex-direction: column;
   overflow: hidden;
 }
+
+.settings-content-header {
+
+  .folder-name-input-wrapper {
+    margin-left: 1rem;
+    width: 18rem;
+    display: flex;
+    position: relative;
+    .folder-custom-emoji {
+      .rlottie-canvas {
+        width: 25px !important;
+        height: 25px !important;
+      }
+    }
+    .folder-name-icon {
+      position: absolute;
+      width: 3rem;
+      right: 0.3125rem;
+      top: 0.3125rem;
+    }
+  }
+}
+
+.predifined-folder-icons-list {
+  display: flex;
+  width: 100%;
+  justify-content: space-evenly;
+  margin-top: 0.1875rem;
+  padding-left: 0.5rem;
+  .Button.tiny {
+    width: 2.875rem;
+  }
+}
+
+.predefined-icon {
+  fill: #9ba0a4;
+  width: 3rem;
+}
+
+.folder-icon-picker {
+  .bubble {
+    top: 13rem;
+    left: 7rem;
+    height: 24rem;
+  }
+}
+
+.picker-tab {
+  .menu-container {
+    width: 24rem;
+    height: 19.1875rem;
+  }
+  .bubble.top {
+    top: 2rem;
+  }
+  .bubble.left {
+    left: -13rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .picker-tab {
+
+    .menu-container {
+      width: 95vw;
+      height: 19.375rem;
+    }
+    .bubble.left {
+      left: -21rem;
+    }
+  }
+}
+
+.is-pointer-env {
+  .picker-tab > .backdrop {
+    position: absolute;
+    top: -1rem;
+    left: -1rem;
+    right: auto;
+    width: 3.5rem;
+    height: 4.5rem;
+  }
+}
+
+.folder-emoticon-search {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  width: initial;
+}

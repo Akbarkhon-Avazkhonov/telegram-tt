@@ -11,11 +11,18 @@
     overflow: hidden;
   }
 
+  @media (max-width: 600px) {
+    .ChatFolders {
+      flex-direction: column !important;
+    }
+    .TabList {
+      flex-direction: row !important;
+    }
+  }
   .ChatFolders {
     height: 100%;
     display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    flex-direction: row;
 
     .tabs-placeholder {
       height: 2.625rem;
@@ -30,8 +37,10 @@
     .TabList {
       justify-content: flex-start;
       border-bottom: 0;
+      flex-direction: column;
       z-index: 1;
-
+      align-items: baseline;
+      height: 100%;
       opacity: 1;
       transition: opacity var(--layer-transition);
     }
@@ -43,6 +52,7 @@
 
     .Tab {
       flex: 0 0 auto;
+      align-items: center;
     }
 
     > .Transition {
@@ -67,4 +77,82 @@
 
     white-space: nowrap;
   }
+}
+
+.ChatFolders {
+  @media (min-width: 600px) {
+    background-color: var(--color-background);
+  }
+  .left-comumn-main-dropdown {
+    background-color: #212121;
+  }
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  background-color: #212121;
+
+  .tabs-placeholder {
+    height: 2.625rem;
+    /* stylelint-disable-next-line plugin/no-low-performance-animation-properties */
+    transition: height 150ms ease;
+
+    &:not(.open) {
+      height: 0;
+    }
+  }
+
+  .TabList {
+    justify-content: flex-start;
+    border-bottom: 0;
+    flex-direction: column;
+    z-index: 1;
+    align-items: baseline;
+    height: 100%;
+    opacity: 1;
+    transition: opacity var(--layer-transition);
+
+    @media (min-width: 600px) {
+      max-height: 100%;
+      overflow-y: auto;
+      padding-bottom: 4rem;
+    }
+
+    .media-inner {
+      overflow: initial;
+    }
+    .AnimatedEmoji {
+      width: 2.1875rem !important;
+      height: 2.1875rem !important;
+    }
+    .sticker-media {
+      width: 2.1875rem !important;
+      height: 2.1875rem !important;
+    }
+
+    .rlottie-canvas {
+      width: 2.1875rem !important;
+      height: 2.1875rem !important;
+    }
+  }
+
+  &--tabs-hidden .TabList {
+    pointer-events: none;
+    opacity: 0.25;
+  }
+
+  .Tab {
+    flex: 0 0 auto;
+    align-items: center;
+    position: relative;
+  }
+
+  > .Transition {
+    flex: 1;
+    overflow: hidden;
+  }
+}
+
+.left-comumn-main-dropdown {
+  padding-top: 0.3125rem;
+  padding-left: 1.125rem;
 }

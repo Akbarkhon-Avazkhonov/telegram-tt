@@ -9,6 +9,7 @@ import forceReflow from '../../util/forceReflow';
 import { MouseButton } from '../../util/windowEnvironment';
 import renderText from '../common/helpers/renderText';
 
+import useAppLayout from '../../hooks/useAppLayout';
 import useContextMenuHandlers from '../../hooks/useContextMenuHandlers';
 import { useFastClick } from '../../hooks/useFastClick';
 import useLastCallback from '../../hooks/useLastCallback';
@@ -32,6 +33,7 @@ type OwnProps = {
   clickArg?: number;
   contextActions?: MenuItemContextAction[];
   contextRootElementSelector?: string;
+  emoticon?: TeactNode;
 };
 
 const classNames = {
@@ -51,6 +53,7 @@ const Tab: FC<OwnProps> = ({
   clickArg,
   contextActions,
   contextRootElementSelector,
+  emoticon,
 }) => {
   // eslint-disable-next-line no-null/no-null
   const tabRef = useRef<HTMLDivElement>(null);
@@ -130,7 +133,7 @@ const Tab: FC<OwnProps> = ({
     () => document.querySelector('#portals')!.querySelector('.Tab-context-menu .bubble'),
   );
   const getLayout = useLastCallback(() => ({ withPortal: true }));
-
+  const { isMobile } = useAppLayout();
   return (
     <div
       className={buildClassName('Tab', onClick && 'Tab--interactive', className)}
@@ -139,11 +142,13 @@ const Tab: FC<OwnProps> = ({
       onContextMenu={handleContextMenu}
       ref={tabRef}
     >
+      {!isMobile && emoticon ? emoticon : undefined}
+      {Boolean(badgeCount) && (
+        <span className={buildClassName('badge', isBadgeActive && classNames.badgeActive)}>{badgeCount}</span>
+      )}
       <span className="Tab_inner">
         {typeof title === 'string' ? renderText(title) : title}
-        {Boolean(badgeCount) && (
-          <span className={buildClassName('badge', isBadgeActive && classNames.badgeActive)}>{badgeCount}</span>
-        )}
+
         {isBlocked && <Icon name="lock-badge" className="blocked" />}
         <i className="platform" />
       </span>

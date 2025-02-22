@@ -33,7 +33,7 @@ const VideoWithSelect = withSelectControl(Video);
 
 type OwnProps = {
   album: IAlbum;
-  observeIntersection: ObserveFn;
+  observeIntersection?: ObserveFn;
   hasCustomAppendix?: boolean;
   isOwn: boolean;
   isProtected?: boolean;

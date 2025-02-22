@@ -73,6 +73,7 @@ import {
   selectUserStatus,
 } from '../../../global/selectors';
 import { copyTextToClipboard } from '../../../util/clipboard';
+import { getSelectionOffset } from '../../../util/getSelectionOffset';
 import { getSelectionAsFormattedText } from './helpers/getSelectionAsFormattedText';
 import { isSelectionRangeInsideMessage } from './helpers/isSelectionRangeInsideMessage';
 
@@ -389,6 +390,7 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
 
   const handleReply = useLastCallback(() => {
     const quoteText = canQuoteSelection && selectionRange ? getSelectionAsFormattedText(selectionRange) : undefined;
+
     if (!canReplyInChat) {
       openReplyMenu({ fromChatId: message.chatId, messageId: message.id, quoteText });
     } else {
@@ -396,6 +398,7 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
         replyToMsgId: message.id,
         quoteText,
         replyToPeerId: undefined,
+        quoteOffset: getSelectionOffset(),
       });
     }
     closeMenu();

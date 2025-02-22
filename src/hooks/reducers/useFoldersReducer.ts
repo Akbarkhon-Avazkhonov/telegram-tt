@@ -1,12 +1,14 @@
 import { getGlobal } from '../../global';
 
-import type { ApiChatFolder } from '../../api/types';
 import type { IconName } from '../../types/icons';
 import type { Dispatch, StateReducer } from '../useReducer';
+import { type ApiChatFolder, ApiMessageEntityTypes } from '../../api/types';
 
 import { selectChat } from '../../global/selectors';
 import { omit, pick } from '../../util/iteratees';
 import useReducer from '../useReducer';
+
+import { PREDEFINED_ICONS } from '../../components/left/settings/folders/FolderIconPicker';
 
 export type FolderChatType = {
   icon: IconName;
@@ -109,12 +111,12 @@ export type FoldersState = {
   error?: string;
   folderId?: number;
   chatFilter: string;
-  folder: Omit<ApiChatFolder, 'id' | 'description' | 'emoticon'>;
+  folder: Omit<ApiChatFolder, 'id' | 'description'>;
   includeFilters?: FolderIncludeFilters;
   excludeFilters?: FolderExcludeFilters;
 };
 export type FoldersActions = (
-  'setTitle' | 'saveFilters' | 'editFolder' | 'reset' | 'setChatFilter' | 'setIsLoading' | 'setError' |
+  'setTitle' | 'setEmoticon' | 'saveFilters' | 'editFolder' | 'reset' | 'setChatFilter' | 'setIsLoading' | 'setError' |
   'editIncludeFilters' | 'editExcludeFilters' | 'setIncludeFilters' | 'setExcludeFilters' | 'setIsTouched' |
   'setFolderId' | 'setIsChatlist'
   );
@@ -140,7 +142,30 @@ const foldersReducer: StateReducer<FoldersState, FoldersActions> = (
         ...state,
         folder: {
           ...state.folder,
-          title: { text: action.payload },
+          title: { ...state.folder.title, text: action.payload },
+        },
+        isTouched: true,
+      };
+    case 'setEmoticon':
+      return {
+        ...state,
+        folder: {
+          ...state.folder,
+          emoticon: !action.payload.documentId ? action.payload.emoji : undefined,
+          title: {
+            text:
+            Object.values(PREDEFINED_ICONS).includes(action.payload.emoji)
+              ? state.folder.title.text
+              : `${action.payload.emoji}${state.folder.title.text}`,
+            entities: action.payload.documentId ? [
+              {
+                type: ApiMessageEntityTypes.CustomEmoji,
+                offset: 0,
+                length: action.payload.emoji.length,
+                documentId: action.payload.documentId,
+              },
+            ] : undefined,
+          },
         },
         isTouched: true,
       };

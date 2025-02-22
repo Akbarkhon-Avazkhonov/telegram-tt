@@ -13,6 +13,7 @@ import { ensureProtocol } from '../../../util/ensureProtocol';
 import getKeyFromEvent from '../../../util/getKeyFromEvent';
 import stopEvent from '../../../util/stopEvent';
 import { INPUT_CUSTOM_EMOJI_SELECTOR } from './helpers/customEmoji';
+import { wrapSelectionInBlockquote, wrapSelectionInCode } from './helpers/wrapInBlockquote';
 
 import useFlag from '../../../hooks/useFlag';
 import useLastCallback from '../../../hooks/useLastCallback';
@@ -31,6 +32,7 @@ export type OwnProps = {
   selectedRange?: Range;
   setSelectedRange: (range: Range) => void;
   onClose: () => void;
+  onTextFormatted: () => void;
 };
 
 interface ISelectedTextFormats {
@@ -40,6 +42,7 @@ interface ISelectedTextFormats {
   strikethrough?: boolean;
   monospace?: boolean;
   spoiler?: boolean;
+  quote?: boolean;
 }
 
 const TEXT_FORMAT_BY_TAG_NAME: Record<string, keyof ISelectedTextFormats> = {
@@ -51,6 +54,7 @@ const TEXT_FORMAT_BY_TAG_NAME: Record<string, keyof ISelectedTextFormats> = {
   DEL: 'strikethrough',
   CODE: 'monospace',
   SPAN: 'spoiler',
+  BLOCKQUOTE: 'quote',
 };
 const fragmentEl = document.createElement('div');
 
@@ -60,6 +64,7 @@ const TextFormatter: FC<OwnProps> = ({
   selectedRange,
   setSelectedRange,
   onClose,
+  onTextFormatted,
 }) => {
   // eslint-disable-next-line no-null/no-null
   const containerRef = useRef<HTMLDivElement>(null);
@@ -292,6 +297,32 @@ const TextFormatter: FC<OwnProps> = ({
     onClose();
   });
 
+  const handleQuoteText = useLastCallback(() => {
+    if (selectedTextFormats.quote) {
+      const element = getSelectedElement()?.closest('blockquote');
+      if (
+        !selectedRange
+        || !element
+        || !element.textContent
+      ) {
+        return;
+      }
+
+      element.replaceWith(element.textContent);
+      setSelectedTextFormats((selectedFormats) => ({
+        ...selectedFormats,
+        quote: false,
+      }));
+      onTextFormatted();
+
+      return;
+    }
+
+    wrapSelectionInBlockquote();
+    onTextFormatted();
+    onClose();
+  });
+
   const handleMonospaceText = useLastCallback(() => {
     if (selectedTextFormats.monospace) {
       const element = getSelectedElement();
@@ -309,12 +340,13 @@ const TextFormatter: FC<OwnProps> = ({
         ...selectedFormats,
         monospace: false,
       }));
+      onTextFormatted();
 
       return;
     }
 
-    const text = getSelectedText(true);
-    document.execCommand('insertHTML', false, `<code class="text-entity-code" dir="auto">${text}</code>`);
+    wrapSelectionInCode();
+    onTextFormatted();
     onClose();
   });
 
@@ -353,6 +385,7 @@ const TextFormatter: FC<OwnProps> = ({
       m: handleMonospaceText,
       s: handleStrikethroughText,
       p: handleSpoilerText,
+      q: handleQuoteText,
     };
 
     const handler = HANDLERS_BY_KEY[getKeyFromEvent(e)];
@@ -423,6 +456,14 @@ const TextFormatter: FC<OwnProps> = ({
           onClick={handleSpoilerText}
         >
           <Icon name="eye-closed" />
+        </Button>
+        <Button
+          color="translucent"
+          ariaLabel="Quote text"
+          className={getFormatButtonClassName('quote')}
+          onClick={handleQuoteText}
+        >
+          <Icon name="quote" />
         </Button>
         <div className="TextFormatter-divider" />
         <Button

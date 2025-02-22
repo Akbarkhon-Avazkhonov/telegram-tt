@@ -24,6 +24,9 @@
   flex-grow: 1;
   justify-content: space-between;
   align-items: center;
+  .save-folder-check {
+    color: var(--color-primary);
+  }
 }
 
 .settings-more-menu {
@@ -99,7 +102,7 @@
 }
 
 .settings-content-icon {
-  margin-bottom: 2.5rem;
+  margin-bottom: 1.6875rem;
 
   &.opacity-transition.not-shown {
     display: block;

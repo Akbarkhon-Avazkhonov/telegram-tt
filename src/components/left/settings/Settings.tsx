@@ -1,18 +1,23 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useState } from '../../../lib/teact/teact';
+import React, { memo, useCallback, useState } from '../../../lib/teact/teact';
 import { getActions, getGlobal } from '../../../global';
 
-import type { FolderEditDispatch, FoldersState } from '../../../hooks/reducers/useFoldersReducer';
+import type { ApiChatFolder } from '../../../api/types';
 import { SettingsScreens } from '../../../types';
 
 import { selectTabState } from '../../../global/selectors';
 import { LAYERS_ANIMATION_NAME } from '../../../util/windowEnvironment';
 
+import {
+  type FolderEditDispatch,
+  type FoldersState, selectChatFilters,
+} from '../../../hooks/reducers/useFoldersReducer';
 import useTwoFaReducer from '../../../hooks/reducers/useTwoFaReducer';
 import useLastCallback from '../../../hooks/useLastCallback';
 
 import Transition from '../../ui/Transition';
 import SettingsFolders from './folders/SettingsFolders';
+import { ERROR_NO_CHATS, ERROR_NO_TITLE } from './folders/SettingsFoldersEdit';
 import SettingsPasscode from './passcode/SettingsPasscode';
 import PrivacyMessages from './PrivacyMessages';
 import SettingsActiveSessions from './SettingsActiveSessions';
@@ -42,6 +47,7 @@ import './Settings.scss';
 
 const TRANSITION_RENDER_COUNT = Object.keys(SettingsScreens).length / 2;
 const TRANSITION_DURATION = 200;
+const SUBMIT_TIMEOUT = 500;
 
 const TWO_FA_SCREENS = [
   SettingsScreens.TwoFaDisabled,
@@ -159,7 +165,10 @@ const Settings: FC<OwnProps> = ({
   onReset,
   shouldSkipTransition,
 }) => {
-  const { closeShareChatFolderModal } = getActions();
+  const {
+    closeShareChatFolderModal, editChatFolder,
+    addChatFolder,
+  } = getActions();
 
   const [twoFaState, twoFaDispatch] = useTwoFaReducer();
   const [privacyPasscode, setPrivacyPasscode] = useState<string>('');
@@ -201,6 +210,55 @@ const Settings: FC<OwnProps> = ({
 
     onReset();
   });
+
+  const isCreating = foldersState.mode === 'create';
+
+  const saveState = useCallback((newState: FoldersState) => {
+    const { title } = newState.folder;
+
+    if (!title) {
+      foldersDispatch({ type: 'setError', payload: ERROR_NO_TITLE });
+      return false;
+    }
+
+    const {
+      selectedChatIds: includedChatIds,
+      selectedChatTypes: includedChatTypes,
+    } = selectChatFilters(newState, 'included');
+
+    if (!includedChatIds.length && !Object.keys(includedChatTypes).length) {
+      foldersDispatch({ type: 'setError', payload: ERROR_NO_CHATS });
+      return false;
+    }
+
+    if (!isCreating) {
+      editChatFolder({ id: newState.folderId!, folderUpdate: newState.folder });
+    } else {
+      addChatFolder({ folder: newState.folder as ApiChatFolder });
+    }
+
+    foldersDispatch({ type: 'setError', payload: undefined });
+    foldersDispatch({ type: 'setIsTouched', payload: false });
+
+    return true;
+  }, [foldersDispatch, isCreating]);
+
+  const handleSaveFolder = useCallback((cb?: NoneToVoidFunction) => {
+    if (!saveState(foldersState)) {
+      return;
+    }
+    cb?.();
+  }, [saveState, foldersState]);
+
+  const handleSaveFolderChanges = useCallback(() => {
+    foldersDispatch({ type: 'setIsLoading', payload: true });
+
+    handleSaveFolder(() => {
+      setTimeout(() => {
+        onReset();
+      }, SUBMIT_TIMEOUT);
+    });
+  }, [foldersDispatch, handleSaveFolder, onReset]);
 
   function renderCurrentSectionContent(isScreenActive: boolean, activeScreen: SettingsScreens) {
     const privacyAllowScreens: Record<number, boolean> = {
@@ -498,6 +556,7 @@ const Settings: FC<OwnProps> = ({
           onReset={handleReset}
           onScreenSelect={onScreenSelect}
           editedFolderId={foldersState.folderId}
+          onSaveFolderChanges={handleSaveFolderChanges}
         />
         {renderCurrentSectionContent(isScreenActive, activeKey)}
       </>

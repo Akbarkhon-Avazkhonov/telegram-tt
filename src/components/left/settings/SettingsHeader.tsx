@@ -22,6 +22,7 @@ type OwnProps = {
   editedFolderId?: number;
   onReset: () => void;
   onScreenSelect: (screen: SettingsScreens) => void;
+  onSaveFolderChanges: () => void;
 };
 
 const SettingsHeader: FC<OwnProps> = ({
@@ -29,10 +30,10 @@ const SettingsHeader: FC<OwnProps> = ({
   editedFolderId,
   onReset,
   onScreenSelect,
+  onSaveFolderChanges,
 }) => {
   const {
     signOut,
-    openDeleteChatFolderModal,
   } = getActions();
 
   const { isMobile } = useAppLayout();
@@ -49,12 +50,6 @@ const SettingsHeader: FC<OwnProps> = ({
   const closeSignOutConfirmation = useCallback(() => {
     setIsSignOutDialogOpen(false);
   }, []);
-
-  const openDeleteFolderConfirmation = useCallback(() => {
-    if (!editedFolderId) return;
-
-    openDeleteChatFolderModal({ folderId: editedFolderId });
-  }, [editedFolderId, openDeleteChatFolderModal]);
 
   const handleSignOutMessage = useCallback(() => {
     closeSignOutConfirmation();
@@ -228,15 +223,16 @@ const SettingsHeader: FC<OwnProps> = ({
           <div className="settings-main-header">
             <h3>{oldLang('FilterEdit')}</h3>
             {Boolean(editedFolderId) && (
-              <DropdownMenu
-                className="settings-more-menu"
-                trigger={SettingsMenuButton}
-                positionX="right"
+              <Button
+                className="save-folder-check"
+                round
+                size="smaller"
+                color="translucent"
+                onClick={onSaveFolderChanges}
+                ariaLabel={oldLang('AccDescrGoBack')}
               >
-                <MenuItem icon="delete" destructive onClick={openDeleteFolderConfirmation}>
-                  {oldLang('Delete')}
-                </MenuItem>
-              </DropdownMenu>
+                <Icon name="check" />
+              </Button>
             )}
           </div>
         );
@@ -293,7 +289,7 @@ const SettingsHeader: FC<OwnProps> = ({
         onClick={onReset}
         ariaLabel={oldLang('AccDescrGoBack')}
       >
-        <Icon name="arrow-left" />
+        <Icon name="close" />
       </Button>
       {renderHeaderContent()}
       <ConfirmDialog

@@ -38,6 +38,7 @@ import { parseInitialLocationHash, parseLocationHash } from '../../util/routing'
 import updateIcon from '../../util/updateIcon';
 import { IS_ANDROID, IS_ELECTRON, IS_WAVE_TRANSFORM_SUPPORTED } from '../../util/windowEnvironment';
 
+import useFoldersReducer from '../../hooks/reducers/useFoldersReducer';
 import useInterval from '../../hooks/schedulers/useInterval';
 import useTimeout from '../../hooks/schedulers/useTimeout';
 import useAppLayout from '../../hooks/useAppLayout';
@@ -534,9 +535,15 @@ const Main = ({
   useBeforeUnload(handleBlur);
   usePreventPinchZoomGesture(isMediaViewerOpen || isStoryViewerOpen);
 
+  const [foldersState, foldersDispatch] = useFoldersReducer();
+
   return (
     <div ref={containerRef} id="Main" className={className}>
-      <LeftColumn ref={leftColumnRef} />
+      <LeftColumn
+        ref={leftColumnRef}
+        foldersDispatch={foldersDispatch}
+        foldersState={foldersState}
+      />
       <MiddleColumn leftColumnRef={leftColumnRef} isMobile={isMobile} />
       <RightColumn isMobile={isMobile} />
       <MediaViewer isOpen={isMediaViewerOpen} />

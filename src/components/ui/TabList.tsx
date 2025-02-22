@@ -7,6 +7,7 @@ import animateHorizontalScroll from '../../util/animateHorizontalScroll';
 import buildClassName from '../../util/buildClassName';
 import { IS_ANDROID, IS_IOS } from '../../util/windowEnvironment';
 
+import useAppLayout from '../../hooks/useAppLayout';
 import useHorizontalScroll from '../../hooks/useHorizontalScroll';
 import useOldLang from '../../hooks/useOldLang';
 import usePreviousDeprecated from '../../hooks/usePreviousDeprecated';
@@ -22,6 +23,7 @@ export type TabWithProperties = {
   isBlocked?: boolean;
   isBadgeActive?: boolean;
   contextActions?: MenuItemContextAction[];
+  emoticon?: TeactNode;
 };
 
 type OwnProps = {
@@ -44,8 +46,8 @@ const TabList: FC<OwnProps> = ({
   // eslint-disable-next-line no-null/no-null
   const containerRef = useRef<HTMLDivElement>(null);
   const previousActiveTab = usePreviousDeprecated(activeTab);
-
-  useHorizontalScroll(containerRef, undefined, true);
+  const { isMobile } = useAppLayout();
+  useHorizontalScroll(containerRef, undefined, isMobile);
 
   // Scroll container to place active tab in the center
   useEffect(() => {
@@ -90,6 +92,7 @@ const TabList: FC<OwnProps> = ({
           previousActiveTab={previousActiveTab}
           onClick={onSwitchTab}
           clickArg={i}
+          emoticon={tab.emoticon}
           contextActions={tab.contextActions}
           contextRootElementSelector={contextRootElementSelector}
           className={tabClassName}

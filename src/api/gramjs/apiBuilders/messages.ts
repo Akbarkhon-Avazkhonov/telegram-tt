@@ -285,6 +285,7 @@ export function buildMessageDraft(draft: GramJs.TypeDraftMessage): ApiDraft | un
   const replyInfo = replyTo instanceof GramJs.InputReplyToMessage ? {
     type: 'message',
     replyToMsgId: replyTo.replyToMsgId,
+    quoteOffset: replyTo.quoteOffset,
     replyToTopId: replyTo.topMsgId,
     replyToPeerId: replyTo.replyToPeerId && getApiChatIdFromMtpPeer(replyTo.replyToPeerId),
     quoteText: replyTo.quoteText ? buildMessageTextContent(replyTo.quoteText, replyTo.quoteEntities) : undefined,

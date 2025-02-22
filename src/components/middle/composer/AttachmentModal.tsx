@@ -88,6 +88,8 @@ export type OwnProps = {
   onEmojiSelect: (emoji: string) => void;
   canScheduleUntilOnline?: boolean;
   onSendWhenOnline?: NoneToVoidFunction;
+  undo?: NoneToVoidFunction;
+  redo?: NoneToVoidFunction;
 };
 
 type StateProps = {
@@ -145,6 +147,8 @@ const AttachmentModal: FC<OwnProps & StateProps> = ({
   onEmojiSelect,
   canScheduleUntilOnline,
   onSendWhenOnline,
+  undo,
+  redo,
 }) => {
   // eslint-disable-next-line no-null/no-null
   const ref = useRef<HTMLDivElement>(null);
@@ -692,6 +696,8 @@ const AttachmentModal: FC<OwnProps & StateProps> = ({
               captionLimit={leftChars}
               shouldSuppressFocus={isMobile && isSymbolMenuOpen}
               onSuppressedFocus={closeSymbolMenu}
+              undo={undo}
+              redo={redo}
             />
             <div className={styles.sendWrapper}>
               <Button

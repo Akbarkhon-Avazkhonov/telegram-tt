@@ -2,7 +2,7 @@ import type { ChangeEvent, RefObject } from 'react';
 import type { FC } from '../../../lib/teact/teact';
 import React, {
   getIsHeavyAnimating,
-  memo, useEffect, useLayoutEffect,
+  memo, useCallback, useEffect, useLayoutEffect,
   useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
@@ -14,11 +14,21 @@ import type { Signal } from '../../../util/signals';
 import { EDITABLE_INPUT_ID } from '../../../config';
 import { requestForcedReflow, requestMutation } from '../../../lib/fasterdom/fasterdom';
 import { selectCanPlayAnimatedEmojis, selectDraft, selectIsInSelectMode } from '../../../global/selectors';
+import {
+  findClosestBlockquote,
+  isCaretAtLineBoundaryInBlockquote,
+  moveCursorAroundBlockquote,
+} from '../../../util/blockquoteHelpers';
 import buildClassName from '../../../util/buildClassName';
 import captureKeyboardListeners from '../../../util/captureKeyboardListeners';
+import {
+  getCaretCharacterOffsetWithin,
+  getCurrentCursorPosition, setCaretPosition, setCursorPosition,
+} from '../../../util/cursor-operations';
 import { getIsDirectTextInputDisabled } from '../../../util/directInputManager';
 import parseEmojiOnlyString from '../../../util/emoji/parseEmojiOnlyString';
 import focusEditableElement from '../../../util/focusEditableElement';
+import { parseMarkdown } from '../../../util/parseHtmlAsFormattedText';
 import { debounce } from '../../../util/schedulers';
 import {
   IS_ANDROID, IS_EMOJI_SUPPORTED, IS_IOS, IS_TOUCH_ENV,
@@ -75,6 +85,8 @@ type OwnProps = {
   onFocus?: NoneToVoidFunction;
   onBlur?: NoneToVoidFunction;
   isNeedPremium?: boolean;
+  undo?:NoneToVoidFunction;
+  redo?: NoneToVoidFunction;
 };
 
 type StateProps = {
@@ -141,6 +153,8 @@ const MessageInput: FC<OwnProps & StateProps> = ({
   onFocus,
   onBlur,
   isNeedPremium,
+  undo,
+  redo,
 }) => {
   const {
     editLastMessage,
@@ -347,11 +361,58 @@ const MessageInput: FC<OwnProps & StateProps> = ({
     // Small delay to allow browser properly recalculate selection
     selectionTimeoutRef.current = window.setTimeout(processSelection, SELECTION_RECALCULATE_DELAY_MS);
   }
+  const cursorPosRef = useRef(0);
+  const getInputCursorPosition = useCallback(() => {
+    if (inputRef.current) {
+      return getCurrentCursorPosition(inputRef.current);
+    }
+    return 0;
+  }, []);
+
+  const setCursorPositionWithDelay = useCallback((position: number) => {
+    setTimeout(() => {
+      if (!inputRef.current) {
+        return;
+      }
+      setCursorPosition(inputRef.current, position);
+    }, 10);
+  }, []);
+
+  const parseInputContentAsMarkdown = useCallback(() => (inputRef.current
+    ? parseMarkdown(inputRef.current.innerHTML, getInputCursorPosition())
+    : ''), [getInputCursorPosition]);
+  const parseContentAsMarkdownOnClick = useCallback(() => {
+    // timeout is needed to let browser place cursor where user clicked
+    setTimeout(() => {
+      const parsedMarkdown = parseInputContentAsMarkdown();
+      if (parsedMarkdown !== inputRef.current?.innerHTML) {
+        const cursorPosition = getInputCursorPosition();
+        const cursorMoveToRight = cursorPosRef.current > cursorPosition;
+        if (cursorMoveToRight) {
+          onUpdate(getHtml() === SAFARI_BR ? '' : parsedMarkdown);
+          setCursorPositionWithDelay(cursorPosition);
+        } else {
+          const lengthBeforeParsing = inputRef.current?.textContent?.length || 0;
+          const lengthAfterParsing = getTextLength(parsedMarkdown);
+          onUpdate(inputRef.current?.innerHTML === SAFARI_BR ? '' : parsedMarkdown);
+
+          if (lengthBeforeParsing !== lengthAfterParsing) {
+            setCursorPositionWithDelay(cursorPosition - (lengthBeforeParsing - lengthAfterParsing));
+          }
+        }
+      }
+    }, 10);
+  }, [getHtml, getInputCursorPosition, onUpdate, parseInputContentAsMarkdown, setCursorPositionWithDelay]);
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
-    if (e.button !== 2) {
+    setTimeout(() => {
+      cursorPosRef.current = getInputCursorPosition();
+    }, 100);
+    const isSignleClick = e.detail === 1;
+    if (e.button !== 2 && isSignleClick) {
       const listenerEl = e.currentTarget.closest(`.${INPUT_WRAPPER_CLASS}`) || e.target;
-
+      // timeout is needed to let browser place cursor where user clicked
+      parseContentAsMarkdownOnClick();
       listenerEl.addEventListener('mouseup', processSelectionWithTimeout, { once: true });
       return;
     }
@@ -379,11 +440,106 @@ const MessageInput: FC<OwnProps & StateProps> = ({
     document.addEventListener('keydown', handleCloseContextMenu);
   }
 
+  const parseMarkdownOnArrowNavigation = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    setTimeout(() => {
+      const parsedMarkdown = parseInputContentAsMarkdown();
+      if (inputRef.current && parsedMarkdown !== inputRef.current.innerHTML) {
+        const updateContentAndCursor = (
+          orderOnUpdateBeforeCaret:boolean,
+          conditionFn:(lengthBefore:number, lengthAfter:number)=>boolean,
+        ) => {
+          if (!inputRef.current) {
+            return;
+          }
+          const lengthBefore = inputRef.current?.textContent?.length || 0;
+          const lengthAfter = getTextLength(parsedMarkdown);
+          const cursorPosition = getInputCursorPosition();
+          let caretOffset;
+
+          if (orderOnUpdateBeforeCaret) {
+            onUpdate(inputRef.current?.innerHTML === SAFARI_BR ? '' : parsedMarkdown);
+            caretOffset = getCaretCharacterOffsetWithin(inputRef.current);
+          } else {
+            caretOffset = getCaretCharacterOffsetWithin(inputRef.current);
+            onUpdate(inputRef.current?.innerHTML === SAFARI_BR ? '' : parsedMarkdown);
+          }
+
+          if (conditionFn(lengthBefore, lengthAfter)) {
+            setCursorPositionWithDelay(cursorPosition - (lengthBefore - lengthAfter));
+          } else {
+            setTimeout(() => {
+              if (!inputRef.current) {
+                return;
+              }
+              setCaretPosition(inputRef.current, caretOffset);
+            }, 10);
+          }
+        };
+
+        switch (e.key) {
+          case 'ArrowRight':
+            updateContentAndCursor(true, (before, after) => before > after);
+            break;
+          case 'ArrowLeft':
+            updateContentAndCursor(false, (before, after) => before < after);
+            break;
+          case 'ArrowUp':
+            updateContentAndCursor(true, (before, after) => before < after);
+            break;
+          case 'ArrowDown':
+            updateContentAndCursor(true, (before, after) => before > after);
+            break;
+          default:
+            break;
+        }
+      }
+    }, 0);
+  }, [getInputCursorPosition, onUpdate, parseInputContentAsMarkdown, setCursorPositionWithDelay]);
+  const handleArrowKeyInBlockquote = useCallback((boundary: 'first' | 'last', moveDirection: 'before' | 'after') => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const blockquote = findClosestBlockquote(range.startContainer);
+    if (!blockquote) {
+      return;
+    }
+
+    const isAtBoundary = isCaretAtLineBoundaryInBlockquote(range, blockquote, boundary);
+    if (isAtBoundary) {
+      moveCursorAroundBlockquote(blockquote, moveDirection);
+      onUpdate(inputRef.current!.innerHTML);
+      focusEditableElement(inputRef.current!, true, true);
+    }
+  }, [onUpdate]);
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     // https://levelup.gitconnected.com/javascript-events-handlers-keyboard-and-load-events-1b3e46a6b0c3#1960
     const { isComposing } = e;
 
     const html = getHtml();
+
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      undo?.();
+    } else if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.key.toLowerCase() === 'y')) {
+      e.preventDefault();
+      redo?.();
+    }
+
+    if (!isComposing && html && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      parseMarkdownOnArrowNavigation(e);
+    }
+
+    if (!isComposing && html && e.key === 'ArrowDown') {
+      handleArrowKeyInBlockquote('last', 'after');
+    }
+    if (!isComposing && html && e.key === 'ArrowUp') {
+      handleArrowKeyInBlockquote('first', 'before');
+    }
+
     if (!isComposing && !html && (e.metaKey || e.ctrlKey)) {
       const targetIndexDelta = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : undefined;
       if (targetIndexDelta) {
@@ -414,11 +570,28 @@ const MessageInput: FC<OwnProps & StateProps> = ({
       e.target.addEventListener('keyup', processSelectionWithTimeout, { once: true });
     }
   }
+  function getTextLength(htmlString:string) {
+    const tempElement = document.createElement('div');
+    tempElement.innerHTML = htmlString;
+    return tempElement.innerText.length;
+  }
 
   function handleChange(e: ChangeEvent<HTMLDivElement>) {
+    if (!inputRef.current) {
+      return;
+    }
     const { innerHTML, textContent } = e.currentTarget;
+    const lengthBeforeParsing = textContent?.length || 0;
 
-    onUpdate(innerHTML === SAFARI_BR ? '' : innerHTML);
+    const onUpdatePayload = parseMarkdown(innerHTML, getCurrentCursorPosition(inputRef.current));
+    const lengthAfterParsing = getTextLength(onUpdatePayload);
+
+    const cursorPosition = getCurrentCursorPosition(inputRef.current);
+    onUpdate(innerHTML === SAFARI_BR ? '' : onUpdatePayload);
+
+    if (lengthBeforeParsing !== lengthAfterParsing) {
+      setCursorPositionWithDelay(cursorPosition - (lengthBeforeParsing - lengthAfterParsing));
+    }
 
     // Reset focus on the input to remove any active styling when input is cleared
     if (
@@ -553,7 +726,12 @@ const MessageInput: FC<OwnProps & StateProps> = ({
   }, [shouldSuppressFocus]);
 
   const isTouched = useDerivedState(() => Boolean(isActive && getHtml()), [isActive, getHtml]);
-
+  const onTextFormatted = useCallback(() => {
+    onUpdate(inputRef.current!.innerHTML);
+    setTimeout(() => {
+      focusEditableElement(inputRef.current!, true, true);
+    }, 0);
+  }, [onUpdate]);
   const className = buildClassName(
     'form-control allow-selection',
     isTouched && 'touched',
@@ -636,6 +814,7 @@ const MessageInput: FC<OwnProps & StateProps> = ({
         selectedRange={selectedRange}
         setSelectedRange={setSelectedRange}
         onClose={handleCloseTextFormatter}
+        onTextFormatted={onTextFormatted}
       />
       {forcedPlaceholder && <span className="forced-placeholder">{renderText(forcedPlaceholder!)}</span>}
     </div>

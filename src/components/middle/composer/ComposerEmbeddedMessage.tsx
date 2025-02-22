@@ -1,6 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, {
-  memo, useEffect, useMemo, useRef,
+  memo, useCallback, useEffect, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
@@ -27,7 +27,10 @@ import {
 } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import captureEscKeyListener from '../../../util/captureEscKeyListener';
+import { getSelectionOffset } from '../../../util/getSelectionOffset';
 import { getPeerColorClass } from '../../common/helpers/peerColor';
+import { getSelectionAsFormattedText } from '../message/helpers/getSelectionAsFormattedText';
+import { isSelectionRangeInsideMessage } from '../message/helpers/isSelectionRangeInsideMessage';
 
 import useContextMenuHandlers from '../../../hooks/useContextMenuHandlers';
 import useCurrentOrPrev from '../../../hooks/useCurrentOrPrev';
@@ -42,6 +45,7 @@ import Button from '../../ui/Button';
 import Menu from '../../ui/Menu';
 import MenuItem from '../../ui/MenuItem';
 import MenuSeparator from '../../ui/MenuSeparator';
+import EditQuoteModal from './EditQuoteModal';
 
 import './ComposerEmbeddedMessage.scss';
 
@@ -96,6 +100,7 @@ const ComposerEmbeddedMessage: FC<OwnProps & StateProps> = ({
   chatId,
   currentUserId,
   isSenderChannel,
+  threadId,
 }) => {
   const {
     resetDraftReplyInfo,
@@ -113,6 +118,8 @@ const ComposerEmbeddedMessage: FC<OwnProps & StateProps> = ({
   const ref = useRef<HTMLDivElement>(null);
   const oldLang = useOldLang();
   const lang = useLang();
+  const [isEditQuoteModalOpen, setIsEditQuoteModalOpen] = useState(false);
+  const closeEditQuoteModal = useCallback(() => setIsEditQuoteModalOpen(false), []);
 
   const isReplyToTopicStart = message?.content.action?.type === 'topicCreate';
   const isShowingReply = replyInfo && !shouldForceShowEditing;
@@ -185,6 +192,25 @@ const ComposerEmbeddedMessage: FC<OwnProps & StateProps> = ({
   const handleRemoveQuoteClick = useLastCallback(buildAutoCloseMenuItemHandler(
     () => updateDraftReplyInfo({ quoteText: undefined }),
   ));
+  const handleEditQuoteClick = useLastCallback(buildAutoCloseMenuItemHandler(() => { setIsEditQuoteModalOpen(true); }));
+  const handleEditQuoteSave = useLastCallback(() => {
+    const selection = window.getSelection();
+
+    const selectionRange = selection && selection?.rangeCount ? selection.getRangeAt(0) : undefined;
+    const isMessageTextSelected = selectionRange
+      && !selectionRange.collapsed
+      && Boolean(message?.content.text?.text)
+      && isSelectionRangeInsideMessage(selectionRange);
+
+    const quoteText = isMessageTextSelected && selectionRange ? getSelectionAsFormattedText(selectionRange) : undefined;
+    setIsEditQuoteModalOpen(false);
+    return updateDraftReplyInfo({
+      replyToMsgId: message!.id,
+      quoteText,
+      replyToPeerId: undefined,
+      quoteOffset: getSelectionOffset(),
+    });
+  });
   const handleChangeReplyRecipientClick = useLastCallback(buildAutoCloseMenuItemHandler(changeRecipient));
   const handleReplyInSenderChat = useLastCallback(() => {
     handleContextMenuClose();
@@ -249,7 +275,6 @@ const ComposerEmbeddedMessage: FC<OwnProps & StateProps> = ({
   }
 
   const canReplyInSenderChat = sender && !isSenderChannel && chatId !== sender.id && sender.id !== currentUserId;
-
   return (
     <div className={className} ref={ref} onContextMenu={handleContextMenu}>
       <div className={innerClassName}>
@@ -259,6 +284,16 @@ const ComposerEmbeddedMessage: FC<OwnProps & StateProps> = ({
             <Icon name="quote" className="quote-reply" />
           )}
         </div>
+        {message && replyInfo && isEditQuoteModalOpen && (
+          <EditQuoteModal
+            isOpen={isEditQuoteModalOpen}
+            handleEditQuoteSave={handleEditQuoteSave}
+            onClose={closeEditQuoteModal}
+            message={message}
+            threadId={threadId}
+            replyInfo={replyInfo}
+          />
+        )}
         <ClosableEmbeddedMessage
           isOpen={isShown}
           className="inside-input"
@@ -353,6 +388,12 @@ const ComposerEmbeddedMessage: FC<OwnProps & StateProps> = ({
                   onClick={handleShowMessageClick}
                 >
                   {oldLang('Message.Context.Goto')}
+                </MenuItem>
+                <MenuItem
+                  icon="edit"
+                  onClick={handleEditQuoteClick}
+                >
+                  {oldLang('lng_reply_options_quote')}
                 </MenuItem>
                 {isReplyWithQuote && (
                   <MenuItem

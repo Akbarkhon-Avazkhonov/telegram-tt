@@ -1,7 +1,10 @@
 #Main {
   height: 100%;
   text-align: left;
-  overflow: hidden;
+  // overflow: hidden;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-rows: 100%;
 
   @media (min-width: 1276px) {
     position: relative;
@@ -13,7 +16,7 @@
 
   @media (min-width: 926px) {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto auto 1fr;
     grid-template-rows: 100%;
   }
 }
@@ -51,10 +54,10 @@
 
   @media (max-width: 925px) {
     position: fixed;
-    left: 0;
+    left: 5rem;
     top: 0;
     height: calc(var(--vh, 1vh) * 100);
-    width: 26.5rem !important;
+    width: 21.5rem !important;
 
     transform: translate3d(-5rem, 0, 0);
     transition: transform var(--layer-transition);

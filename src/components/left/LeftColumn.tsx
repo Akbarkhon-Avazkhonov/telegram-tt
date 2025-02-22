@@ -1,12 +1,13 @@
-import type { RefObject } from 'react';
+import { type RefObject } from 'react';
 import React, {
-  memo, useEffect, useMemo, useState,
+  memo, useCallback,
+  useEffect, useMemo, useState,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { GlobalState } from '../../global/types';
-import type { FoldersActions } from '../../hooks/reducers/useFoldersReducer';
-import type { ReducerAction } from '../../hooks/useReducer';
+import type { FoldersActions, FoldersState } from '../../hooks/reducers/useFoldersReducer';
+import type { Dispatch, ReducerAction } from '../../hooks/useReducer';
 import { LeftColumnContent, SettingsScreens } from '../../types';
 
 import { selectCurrentChat, selectIsForumPanelOpen, selectTabState } from '../../global/selectors';
@@ -16,7 +17,6 @@ import {
   IS_APP, IS_FIREFOX, IS_MAC_OS, IS_TOUCH_ENV, LAYERS_ANIMATION_NAME,
 } from '../../util/windowEnvironment';
 
-import useFoldersReducer from '../../hooks/reducers/useFoldersReducer';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import useLastCallback from '../../hooks/useLastCallback';
 import usePrevious from '../../hooks/usePrevious';
@@ -25,6 +25,7 @@ import useSyncEffect from '../../hooks/useSyncEffect';
 
 import Transition from '../ui/Transition';
 import ArchivedChats from './ArchivedChats.async';
+import ChatFolders from './main/ChatFolders';
 import LeftMain from './main/LeftMain';
 import NewChat from './newChat/NewChat.async';
 import Settings from './settings/Settings.async';
@@ -33,6 +34,8 @@ import './LeftColumn.scss';
 
 interface OwnProps {
   ref: RefObject<HTMLDivElement>;
+  foldersDispatch: Dispatch<FoldersState, FoldersActions>;
+  foldersState: FoldersState;
 }
 
 type StateProps = {
@@ -52,6 +55,7 @@ type StateProps = {
   isClosingSearch?: boolean;
   archiveSettings: GlobalState['archiveSettings'];
   isArchivedStoryRibbonShown?: boolean;
+  isStoryRibbonShown?: boolean;
 };
 
 enum ContentType {
@@ -86,6 +90,9 @@ function LeftColumn({
   isClosingSearch,
   archiveSettings,
   isArchivedStoryRibbonShown,
+  foldersDispatch,
+  foldersState,
+  isStoryRibbonShown,
 }: OwnProps & StateProps) {
   const {
     setGlobalSearchQuery,
@@ -97,12 +104,12 @@ function LeftColumn({
     clearTwoFaError,
     openChat,
     requestNextSettingsScreen,
+    closeForumPanel,
   } = getActions();
 
   const [content, setContent] = useState<LeftColumnContent>(LeftColumnContent.ChatList);
   const [settingsScreen, setSettingsScreen] = useState(SettingsScreens.Main);
   const [contactsFilter, setContactsFilter] = useState<string>('');
-  const [foldersState, foldersDispatch] = useFoldersReducer();
 
   // Used to reset child components in background.
   const [lastResetTime, setLastResetTime] = useState<number>(0);
@@ -540,26 +547,53 @@ function LeftColumn({
             isElectronUpdateAvailable={isElectronUpdateAvailable}
             isForumPanelOpen={isForumPanelOpen}
             onTopicSearch={handleTopicSearch}
+            isStoryRibbonShown={isStoryRibbonShown}
           />
         );
     }
   }
 
+  const isForumPanelRendered = isForumPanelOpen && content === LeftColumnContent.ChatList;
+  const isForumPanelVisible = isForumPanelRendered;
+  const handleSelectSettings = useCallback(() => setContent(LeftColumnContent.Settings), []);
+  const handleSelectContact = useCallback(() => setContent(LeftColumnContent.Contacts), []);
+  const handleSelectMessages = useCallback(() => setContent(LeftColumnContent.ChatList), []);
+  const handleSelectAtchived = useCallback(() => {
+    setContent(LeftColumnContent.Archived);
+    closeForumPanel();
+  }, []);
   return (
-    <Transition
-      ref={ref}
-      name={shouldSkipHistoryAnimations ? 'none' : LAYERS_ANIMATION_NAME}
-      renderCount={RENDER_COUNT}
-      activeKey={contentType}
-      shouldCleanup
-      cleanupExceptionKey={ContentType.Main}
-      shouldWrap
-      wrapExceptionKey={ContentType.Main}
-      id="LeftColumn"
-      withSwipeControl
-    >
-      {renderContent}
-    </Transition>
+    <>
+      <div className="left-chats-tabs">
+        <ChatFolders
+          shouldHideFolderTabs={isForumPanelVisible}
+          onSettingsScreenSelect={handleSettingsScreenSelect}
+          onLeftColumnContentChange={setContent}
+          foldersDispatch={foldersDispatch}
+          onSelectSettings={handleSelectSettings}
+          onSelectContacts={handleSelectContact}
+          onSelectArchived={handleSelectAtchived}
+          onSelectMessages={handleSelectMessages}
+          onReset={handleReset}
+          shouldSkipTransition={shouldSkipHistoryAnimations}
+          content={content}
+        />
+      </div>
+      <Transition
+        ref={ref}
+        name={shouldSkipHistoryAnimations ? 'none' : LAYERS_ANIMATION_NAME}
+        renderCount={RENDER_COUNT}
+        activeKey={contentType}
+        shouldCleanup
+        cleanupExceptionKey={ContentType.Main}
+        shouldWrap
+        wrapExceptionKey={ContentType.Main}
+        id="LeftColumn"
+        withSwipeControl
+      >
+        {renderContent}
+      </Transition>
+    </>
   );
 }
 
@@ -593,6 +627,7 @@ export default memo(withGlobal<OwnProps>(
     const isChatOpen = Boolean(currentChat?.id);
     const isForumPanelOpen = selectIsForumPanelOpen(global);
     const forumPanelChatId = tabState.forumPanelChatId;
+    const { storyViewer: { isRibbonShown: isStoryRibbonShown } } = selectTabState(global);
 
     return {
       searchQuery: query,
@@ -611,6 +646,7 @@ export default memo(withGlobal<OwnProps>(
       isClosingSearch: tabState.globalSearch.isClosing,
       archiveSettings,
       isArchivedStoryRibbonShown: isArchivedRibbonShown,
+      isStoryRibbonShown,
     };
   },
 )(LeftColumn));

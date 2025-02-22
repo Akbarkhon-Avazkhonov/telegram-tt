@@ -12,10 +12,10 @@ const RIBBON_OFFSET = 0.25 * REM;
 const RIBBON_Z_INDEX = 11;
 const STROKE_OFFSET = 0.1875 * REM;
 const CANVAS_OFFSET = 0.125 * REM;
-
+const SIDEBAR_WIDTH = 80;
 const callbacks: Set<NoneToVoidFunction> = new Set();
 
-export function animateOpening(isArchived?: boolean) {
+export function animateOpening(isArchived?: boolean, hasSidebar?:boolean) {
   cancelDelayedCallbacks();
 
   const {
@@ -98,7 +98,7 @@ export function animateOpening(isArchived?: boolean) {
 
       applyStyles(ghost, {
         top: `${toTop}px`,
-        left: `${toLeft}px`,
+        left: `${toLeft - (hasSidebar ? SIDEBAR_WIDTH : 0)}px`,
         zIndex: `${zIndex}`,
         opacity: ghost2 ? '0' : '',
         transform: `translate3d(${fromTranslateX}px, ${fromTranslateY}px, 0) scale(${fromScale})`,
@@ -107,7 +107,7 @@ export function animateOpening(isArchived?: boolean) {
       if (ghost2) {
         applyStyles(ghost2, {
           top: `${fromTop}px`,
-          left: `${fromLeft}px`,
+          left: `${fromLeft - (hasSidebar ? SIDEBAR_WIDTH : 0)}px`,
           zIndex: `${zIndex}`,
         });
       }
@@ -153,7 +153,7 @@ export function animateOpening(isArchived?: boolean) {
   });
 }
 
-export function animateClosing(isArchived?: boolean) {
+export function animateClosing(isArchived?: boolean, hasSidebar?:boolean) {
   cancelDelayedCallbacks();
 
   const {
@@ -234,7 +234,7 @@ export function animateClosing(isArchived?: boolean) {
 
       applyStyles(ghost, {
         top: `${fromTop}px`,
-        left: `${fromLeft}px`,
+        left: `${fromLeft - (hasSidebar ? SIDEBAR_WIDTH : 0)}px`,
         width: `${fromWidth}px`,
         zIndex: `${zIndex}`,
       });
@@ -242,7 +242,7 @@ export function animateClosing(isArchived?: boolean) {
       if (ghost2) {
         applyStyles(ghost2, {
           top: `${toTop}px`,
-          left: `${toLeft}px`,
+          left: `${toLeft - (hasSidebar ? SIDEBAR_WIDTH : 0)}px`,
           zIndex: `${zIndex}`,
           opacity: '0',
           transform: `translate3d(${fromTranslateX}px, ${fromTranslateY}px, 0) scale(${fromScale})`,

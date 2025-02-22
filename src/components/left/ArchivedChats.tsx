@@ -130,7 +130,12 @@ const ArchivedChats: FC<OwnProps> = ({
         )}
       >
         {shouldRenderStoryRibbon && (
-          <StoryRibbon isArchived className="left-header-shadow" isClosing={isStoryRibbonClosing} />
+          <StoryRibbon
+            isArchived
+            className="left-header-shadow"
+            isClosing={isStoryRibbonClosing}
+            isOpen={shouldRenderStoryRibbon}
+          />
         )}
         <ChatList
           folderType="archived"

@@ -45,7 +45,7 @@ type OwnProps = {
 
 type StateProps = Pick<GlobalState, 'recentEmojis'>;
 
-type EmojiCategoryData = { id: string; name: string; emojis: string[] };
+export type EmojiCategoryData = { id: string; name: string; emojis: string[] };
 
 const ICONS_BY_CATEGORY: Record<string, IconName> = {
   recent: 'recent',

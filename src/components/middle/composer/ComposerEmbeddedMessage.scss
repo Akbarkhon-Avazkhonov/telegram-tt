@@ -72,3 +72,52 @@
     }
   }
 }
+
+.edit-quote-modal {
+  .modal-content {
+
+    padding: 0 !important;
+  }
+  .InlineButtons {
+    display: none;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+  }
+  .Message {
+    padding-bottom: 1rem;
+    padding-top: 1rem;
+
+    background-color: var(--theme-background-color);
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+  .modal-dialog {
+    width: fit-content;
+  }
+  .edit-quote-controls {
+    display: flex;
+    justify-content: end;
+    margin-right: 0.5rem;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+  .quote-control {
+    width: fit-content;
+    margin-right: 1rem;
+  }
+  .quote-hint {
+    color: #648499;
+    background-color: #232e3c;
+    padding-top: 0.5rem;
+    padding-bottom: 0.75rem;
+    padding-left: 1rem;
+    font-size: 0.75rem;
+    margin-top: 1.5rem;
+    &--light {
+      background-color: #f1f1f1;
+    }
+  }
+}

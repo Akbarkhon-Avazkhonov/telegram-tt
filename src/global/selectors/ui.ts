@@ -102,6 +102,10 @@ export function selectIsReactionPickerOpen<T extends GlobalState>(
   return Boolean(reactionPicker?.position);
 }
 
+export function selectIsFolderIconPickerOpen<T extends GlobalState>(global: T) {
+  return !!global.settings.isEditFolderIconPickerOpen;
+}
+
 export function selectPerformanceSettings<T extends GlobalState>(global: T) {
   return global.settings.performance;
 }

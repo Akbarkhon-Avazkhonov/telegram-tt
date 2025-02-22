@@ -454,6 +454,7 @@ export interface ApiInputMessageReplyInfo {
   replyToTopId?: number;
   replyToPeerId?: string;
   quoteText?: ApiFormattedText;
+  quoteOffset?: number;
 }
 
 export interface ApiInputStoryReplyInfo {
