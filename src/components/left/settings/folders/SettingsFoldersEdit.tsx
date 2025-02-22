@@ -101,7 +101,7 @@ const getEmoticon = (state:FoldersState):TeactNode | undefined => {
     case PREDEFINED_ICONS.FOLDER:
       return <FolderIcon className="predefined-icon" />;
     default:
-      return <span className="emoji-emoticon">{renderText(state.folder.emoticon, ['emoji'])[0]}</span>;
+      return <span className="emoji-emoticon">{renderText(state.folder.emoticon)}</span>;
   }
 };
 

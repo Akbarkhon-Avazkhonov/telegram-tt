@@ -1,29 +1,30 @@
 import type { RefObject } from '../../lib/teact/teact';
-import React, {
-  memo, useEffect, useMemo,
-  useRef,
-} from '../../lib/teact/teact';
+import React, { memo, useEffect, useMemo, useRef } from '../../lib/teact/teact';
 
 import type { ThemeKey } from '../../types';
 
 import {
   fragmentShader,
-  hexToVec3, loadShaders, shadersConfig, vertexShader,
+  hexToVec3,
+  loadShaders,
+  shadersConfig,
+  vertexShader,
 } from './shaders/backgroundShaders';
 
 import styles from './MiddleColumn.module.scss';
 
 type OwnProps = {
-  theme:ThemeKey;
-  animateFnRef:RefObject<NoneToVoidFunction | undefined> ;
+  theme: ThemeKey;
+  animateFnRef: RefObject<NoneToVoidFunction | undefined>;
 };
-let keyShift = 0;
 
-let targetColor1Pos: number[];
-let targetColor2Pos: number[];
-let targetColor3Pos: number[];
-let targetColor4Pos: number[];
-const keyPoints = [
+let positionCycle = 0;
+let targetShade1Pos: number[];
+let targetShade2Pos: number[];
+let targetShade3Pos: number[];
+let targetShade4Pos: number[];
+
+const transitionPoints = [
   [0.265, 0.582],
   [0.176, 0.918],
   [1 - 0.585, 1 - 0.164],
@@ -33,96 +34,98 @@ const keyPoints = [
   [0.585, 0.164],
   [1 - 0.644, 1 - 0.755],
 ];
-const speed = 0.1;
-let animating = false;
 
-const BackgroundShaders = ({ theme, animateFnRef }:OwnProps) => {
-  // eslint-disable-next-line no-null/no-null
-  const shadersCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const colors = useMemo(() => ({
-    color1: hexToVec3(shadersConfig[theme].colors.color1),
-    color2: hexToVec3(shadersConfig[theme].colors.color2),
-    color3: hexToVec3(shadersConfig[theme].colors.color3),
-    color4: hexToVec3(shadersConfig[theme].colors.color4),
+const transitionSpeed = 0.1;
+let isAnimating = false;
+const colorOffset = 0.05; // Небольшое смещение для изменения оттенков
+
+const GradientCanvas = ({ theme, animateFnRef }: OwnProps) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const shades = useMemo(() => ({
+    shade1: hexToVec3(shadersConfig[theme].colors.color1).map(c => c + colorOffset) as [number, number, number],
+    shade2: hexToVec3(shadersConfig[theme].colors.color2).map(c => c + colorOffset) as [number, number, number],
+    shade3: hexToVec3(shadersConfig[theme].colors.color3).map(c => c + colorOffset) as [number, number, number],
+    shade4: hexToVec3(shadersConfig[theme].colors.color4).map(c => c + colorOffset) as [number, number, number],
   }), [theme]);
 
   useEffect(() => {
-    if (!shadersCanvasRef.current) {
-      return;
-    }
+    if (!canvasRef.current) return;
 
-    const context = prepareWebGLContext({ canvas: shadersCanvasRef.current });
-    if (!context) {
-      return;
-    }
-    const { gl, program } = context;
+    const renderContext = initializeWebGL({ canvas: canvasRef.current });
+    if (!renderContext) return;
 
-    updateTargetColors();
+    const { gl, program } = renderContext;
 
-    const color1Pos = [targetColor1Pos![0], targetColor1Pos![1]];
-    const color2Pos = [targetColor2Pos![0], targetColor2Pos![1]];
-    const color3Pos = [targetColor3Pos![0], targetColor3Pos![1]];
-    const color4Pos = [targetColor4Pos![0], targetColor4Pos![1]];
+    refreshTargetPositions();
 
-    renderGradientCanvas(gl, program, colors, {
-      color1Pos, color2Pos, color3Pos, color4Pos,
+    const shade1Pos = [targetShade1Pos![0], targetShade1Pos![1]];
+    const shade2Pos = [targetShade2Pos![0], targetShade2Pos![1]];
+    const shade3Pos = [targetShade3Pos![0], targetShade3Pos![1]];
+    const shade4Pos = [targetShade4Pos![0], targetShade4Pos![1]];
+
+    drawGradient(gl, program, shades, {
+      shade1Pos,
+      shade2Pos,
+      shade3Pos,
+      shade4Pos,
     });
 
-    function animate() {
-      animating = true;
+    function transition() {
+      isAnimating = true;
 
       if (
-        distance(color1Pos, targetColor1Pos) > 0.01
-    || distance(color2Pos, targetColor2Pos) > 0.01
-    || distance(color3Pos, targetColor3Pos) > 0.01
-    || distance(color4Pos, targetColor4Pos) > 0.01
+        computeDistance(shade1Pos, targetShade1Pos) > 0.01 ||
+        computeDistance(shade2Pos, targetShade2Pos) > 0.01 ||
+        computeDistance(shade3Pos, targetShade3Pos) > 0.01 ||
+        computeDistance(shade4Pos, targetShade4Pos) > 0.01
       ) {
-        color1Pos[0] = color1Pos[0] * (1 - speed) + targetColor1Pos[0] * speed;
-        color1Pos[1] = color1Pos[1] * (1 - speed) + targetColor1Pos[1] * speed;
-        color2Pos[0] = color2Pos[0] * (1 - speed) + targetColor2Pos[0] * speed;
-        color2Pos[1] = color2Pos[1] * (1 - speed) + targetColor2Pos[1] * speed;
-        color3Pos[0] = color3Pos[0] * (1 - speed) + targetColor3Pos[0] * speed;
-        color3Pos[1] = color3Pos[1] * (1 - speed) + targetColor3Pos[1] * speed;
-        color4Pos[0] = color4Pos[0] * (1 - speed) + targetColor4Pos[0] * speed;
-        color4Pos[1] = color4Pos[1] * (1 - speed) + targetColor4Pos[1] * speed;
-        renderGradientCanvas(gl, program, colors, {
-          color1Pos, color2Pos, color3Pos, color4Pos,
+        shade1Pos[0] = shade1Pos[0] * (1 - transitionSpeed) + targetShade1Pos[0] * transitionSpeed;
+        shade1Pos[1] = shade1Pos[1] * (1 - transitionSpeed) + targetShade1Pos[1] * transitionSpeed;
+        shade2Pos[0] = shade2Pos[0] * (1 - transitionSpeed) + targetShade2Pos[0] * transitionSpeed;
+        shade2Pos[1] = shade2Pos[1] * (1 - transitionSpeed) + targetShade2Pos[1] * transitionSpeed;
+        shade3Pos[0] = shade3Pos[0] * (1 - transitionSpeed) + targetShade3Pos[0] * transitionSpeed;
+        shade3Pos[1] = shade3Pos[1] * (1 - transitionSpeed) + targetShade3Pos[1] * transitionSpeed;
+        shade4Pos[0] = shade4Pos[0] * (1 - transitionSpeed) + targetShade4Pos[0] * transitionSpeed;
+        shade4Pos[1] = shade4Pos[1] * (1 - transitionSpeed) + targetShade4Pos[1] * transitionSpeed;
+
+        drawGradient(gl, program, shades, {
+          shade1Pos,
+          shade2Pos,
+          shade3Pos,
+          shade4Pos,
         });
-        requestAnimationFrame(animate);
+
+        requestAnimationFrame(transition);
       } else {
-        animating = false;
+        isAnimating = false;
       }
     }
 
-    function animateFn() {
-      if (!animating) {
-        updateTargetColors();
-        requestAnimationFrame(animate);
+    function triggerTransition() {
+      if (!isAnimating) {
+        refreshTargetPositions();
+        requestAnimationFrame(transition);
       }
     }
-    animateFnRef.current = animateFn;
-  }, [animateFnRef, colors]);
 
-  return (
-    <canvas
-      className={styles.chatBgCanvas}
-      ref={shadersCanvasRef}
-    />
-  );
+    if (animateFnRef) {
+      animateFnRef.current = triggerTransition;
+    }
+  }, [animateFnRef, shades]);
+
+  return <canvas className={styles.chatBgCanvas} ref={canvasRef} />;
 };
 
-export default memo(BackgroundShaders);
+export default memo(GradientCanvas);
 
-function prepareWebGLContext({ canvas }:{ canvas:HTMLCanvasElement }):
-{ gl: WebGLRenderingContext; program:WebGLProgram } | undefined {
+function initializeWebGL({ canvas }: { canvas: HTMLCanvasElement }): 
+  { gl: WebGLRenderingContext; program: WebGLProgram } | undefined {
   const gl = canvas.getContext('webgl');
-  if (!gl) {
-    return undefined;
-  }
+  if (!gl) return undefined;
+
   const program = gl.createProgram()!;
-  if (!program) {
-    return undefined;
-  }
+  if (!program) return undefined;
 
   const shaders = loadShaders(gl, [vertexShader, fragmentShader]);
   for (const shader of shaders) {
@@ -130,104 +133,79 @@ function prepareWebGLContext({ canvas }:{ canvas:HTMLCanvasElement }):
   }
   gl.linkProgram(program);
 
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    return undefined;
-  }
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return undefined;
+
   gl.useProgram(program);
 
-  const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
-  const positionBuffer = gl.createBuffer();
+  const positionSlot = gl.getAttribLocation(program, 'a_position');
+  const buffer = gl.createBuffer();
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(
     gl.ARRAY_BUFFER,
-    new Float32Array([
-      -1,
-      -1,
-      1,
-      -1,
-      -1,
-      1,
-      -1,
-      1,
-      1,
-      -1,
-      1,
-      1,
-    ]),
-    gl.STATIC_DRAW,
+    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+    gl.STATIC_DRAW
   );
 
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  gl.enableVertexAttribArray(positionAttributeLocation);
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  gl.vertexAttribPointer(
-    positionAttributeLocation,
-    2,
-    gl.FLOAT,
-    false,
-    0,
-    0,
-  );
+  gl.enableVertexAttribArray(positionSlot);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.vertexAttribPointer(positionSlot, 2, gl.FLOAT, false, 0, 0);
+
   return { gl, program };
 }
 
-function distance(p1: number[], p2: number[]) {
-  return Math.sqrt(
-    (p1[1] - p2[1]) * (p1[1] - p2[1]),
-  );
+function computeDistance(pointA: number[], pointB: number[]): number {
+  return Math.sqrt((pointA[1] - pointB[1]) * (pointA[1] - pointB[1]));
 }
-type ColorsPositions = {
-  color1Pos:number[];
-  color2Pos:number[];
-  color3Pos:number[];
-  color4Pos:number[];
+
+type ShadePositions = {
+  shade1Pos: number[];
+  shade2Pos: number[];
+  shade3Pos: number[];
+  shade4Pos: number[];
 };
-  type HexColors = {
-    color1: readonly [r: number, g: number, b: number];
-    color2: readonly [r: number, g: number, b: number];
-    color3: readonly [r: number, g: number, b: number];
-    color4: readonly [r: number, g: number, b: number];
-  };
-function renderGradientCanvas(
-  gl:WebGLRenderingContext,
-  program:WebGLProgram,
-  colors: HexColors,
-  {
-    color1Pos, color2Pos, color3Pos, color4Pos,
-  }:ColorsPositions,
+
+type ShadeColors = {
+  shade1: readonly [r: number, g: number, b: number];
+  shade2: readonly [r: number, g: number, b: number];
+  shade3: readonly [r: number, g: number, b: number];
+  shade4: readonly [r: number, g: number, b: number];
+};
+
+function drawGradient(
+  gl: WebGLRenderingContext,
+  program: WebGLProgram,
+  shades: ShadeColors,
+  { shade1Pos, shade2Pos, shade3Pos, shade4Pos }: ShadePositions
 ) {
-  const resolutionLoc = gl.getUniformLocation(program, 'resolution');
-  const color1Loc = gl.getUniformLocation(program, 'color1');
-  const color2Loc = gl.getUniformLocation(program, 'color2');
-  const color3Loc = gl.getUniformLocation(program, 'color3');
-  const color4Loc = gl.getUniformLocation(program, 'color4');
-  const color1PosLoc = gl.getUniformLocation(program, 'color1Pos');
-  const color2PosLoc = gl.getUniformLocation(program, 'color2Pos');
-  const color3PosLoc = gl.getUniformLocation(program, 'color3Pos');
-  const color4PosLoc = gl.getUniformLocation(program, 'color4Pos');
+  const resolutionSlot = gl.getUniformLocation(program, 'resolution');
+  const shade1Slot = gl.getUniformLocation(program, 'color1');
+  const shade2Slot = gl.getUniformLocation(program, 'color2');
+  const shade3Slot = gl.getUniformLocation(program, 'color3');
+  const shade4Slot = gl.getUniformLocation(program, 'color4');
+  const shade1PosSlot = gl.getUniformLocation(program, 'color1Pos');
+  const shade2PosSlot = gl.getUniformLocation(program, 'color2Pos');
+  const shade3PosSlot = gl.getUniformLocation(program, 'color3Pos');
+  const shade4PosSlot = gl.getUniformLocation(program, 'color4Pos');
 
-  gl.uniform2fv(resolutionLoc, [gl.canvas.width, gl.canvas.height]);
-  gl.uniform3fv(color1Loc, colors.color1);
-  gl.uniform3fv(color2Loc, colors.color2);
-  gl.uniform3fv(color3Loc, colors.color3);
-  gl.uniform3fv(color4Loc, colors.color4);
-  gl.uniform2fv(color1PosLoc, color1Pos);
-  gl.uniform2fv(color2PosLoc, color2Pos);
-  gl.uniform2fv(color3PosLoc, color3Pos);
-  gl.uniform2fv(color4PosLoc, color4Pos);
+  gl.uniform2fv(resolutionSlot, [gl.canvas.width, gl.canvas.height]);
+  gl.uniform3fv(shade1Slot, shades.shade1);
+  gl.uniform3fv(shade2Slot, shades.shade2);
+  gl.uniform3fv(shade3Slot, shades.shade3);
+  gl.uniform3fv(shade4Slot, shades.shade4);
+  gl.uniform2fv(shade1PosSlot, shade1Pos);
+  gl.uniform2fv(shade2PosSlot, shade2Pos);
+  gl.uniform2fv(shade3PosSlot, shade3Pos);
+  gl.uniform2fv(shade4PosSlot, shade4Pos);
 
-  gl.drawArrays(
-    gl.TRIANGLES,
-    0,
-    6,
-  );
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-function updateTargetColors() {
-  targetColor1Pos = keyPoints[keyShift % 8];
-  targetColor2Pos = keyPoints[(keyShift + 2) % 8];
-  targetColor3Pos = keyPoints[(keyShift + 4) % 8];
-  targetColor4Pos = keyPoints[(keyShift + 6) % 8];
-  keyShift = (keyShift + 1) % 8;
+function refreshTargetPositions() {
+  targetShade1Pos = transitionPoints[positionCycle % 8];
+  targetShade2Pos = transitionPoints[(positionCycle + 2) % 8];
+  targetShade3Pos = transitionPoints[(positionCycle + 4) % 8];
+  targetShade4Pos = transitionPoints[(positionCycle + 6) % 8];
+  positionCycle = (positionCycle + 1) % 8;
 }

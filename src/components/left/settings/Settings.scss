@@ -129,7 +129,7 @@
 .settings-item {
   text-align: initial;
   padding: 1.5rem 0.5rem 1rem;
-
+  
   @include mixins.adapt-padding-to-scrollbar(0.5rem);
   @include mixins.side-panel-section;
 }

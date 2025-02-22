@@ -57,8 +57,8 @@
   }
 
   .Tab_inner {
+    
     position: relative;
-    display: flex;
     align-items: center;
     white-space: nowrap;
     gap: 1px; // Prevent custom emoji sticking to the text
@@ -67,7 +67,7 @@
   .badge {
     min-width: 1.125rem;
     height: 1.125rem;
-    margin-inline-start: 0.5rem;
+    margin-inline-start: 1.2rem;
     border-radius: 0.75rem;
     padding: 0 0.3125rem;
     color: white;

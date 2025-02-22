@@ -111,7 +111,7 @@ export type FoldersState = {
   error?: string;
   folderId?: number;
   chatFilter: string;
-  folder: Omit<ApiChatFolder, 'id' | 'description'>;
+  folder: Omit<ApiChatFolder, 'id' | 'description' | 'emoticon'> ;
   includeFilters?: FolderIncludeFilters;
   excludeFilters?: FolderExcludeFilters;
 };
@@ -147,25 +147,13 @@ const foldersReducer: StateReducer<FoldersState, FoldersActions> = (
         isTouched: true,
       };
     case 'setEmoticon':
+      // update folder with new emoticon
       return {
         ...state,
         folder: {
           ...state.folder,
-          emoticon: !action.payload.documentId ? action.payload.emoji : undefined,
-          title: {
-            text:
-            Object.values(PREDEFINED_ICONS).includes(action.payload.emoji)
-              ? state.folder.title.text
-              : `${action.payload.emoji}${state.folder.title.text}`,
-            entities: action.payload.documentId ? [
-              {
-                type: ApiMessageEntityTypes.CustomEmoji,
-                offset: 0,
-                length: action.payload.emoji.length,
-                documentId: action.payload.documentId,
-              },
-            ] : undefined,
-          },
+          emoticon: action.payload.emoji, // Всегда устанавливаем emoji как emoticon
+          // Оставляем title.text и entities без изменений
         },
         isTouched: true,
       };
